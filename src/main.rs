@@ -64,7 +64,6 @@ fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<CollisionInfo>) {
         wheel.vel += wheel.force / WHEEL_MASS * dt;
     }
     wheel.ang += wheel.ang_vel * dt;
-    wheel.ang %= 2.0 * PI;
 
     wheel.pos += wheel.vel * dt;
 }
@@ -72,6 +71,8 @@ fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<CollisionInfo>) {
 struct Bike {
     frame: Body,
     wheels: [Body; 2],
+    breaking: bool,
+    break_angles: [f32; 2],
 }
 impl Bike {
     fn new(pos: Vec2) -> Bike {
@@ -90,10 +91,13 @@ impl Bike {
                     ..Default::default()
                 },
             ],
+            breaking: false,
+            break_angles: [0.0; 2],
         }
     }
 
     fn update(&mut self, dt: f32, walls: &Vec<Wall>) {
+
         // calc forces
         self.frame.torque = 0.0;
         self.frame.force = vec2(0.0, GRAVITY * FRAME_MASS);
@@ -103,40 +107,50 @@ impl Bike {
         self.wheels[1].force = vec2(0.0, GRAVITY * WHEEL_MASS);
 
         // move around
-        if is_key_down(KeyCode::Right) {
+        if is_key_down(KeyCode::D) {
             self.frame.force.x += 5000.0;
         }
-        if is_key_down(KeyCode::Left) {
+        if is_key_down(KeyCode::A) {
             self.frame.force.x -= 5000.0;
         }
-        if is_key_down(KeyCode::Down) {
+        if is_key_down(KeyCode::S) {
             self.frame.force.y += 5000.0;
         }
-        if is_key_down(KeyCode::Up) {
+        if is_key_down(KeyCode::W) {
             self.frame.force.y -= 5000.0;
         }
 
         // break
-        if is_key_down(KeyCode::Z) {
-            for wheel in self.wheels.iter_mut() {
-                //
+        let breaking = is_key_down(KeyCode::Down);
+        if breaking && !self.breaking {
+            for (i, wheel) in self.wheels.iter().enumerate() {
+                self.break_angles[i] = wheel.ang - self.frame.ang;
             }
+        }
+        self.breaking = breaking;
+        if breaking {
+            for (i, wheel) in self.wheels.iter_mut().enumerate() {
+                let da = wheel.ang - self.frame.ang - self.break_angles[i];
+                let dv = wheel.ang_vel - self.frame.ang_vel;
+
+                let torque = da * 60000.0 + dv * 40000.0;
+                wheel.torque -= torque;
+                self.frame.torque += torque;
+            }
+        }
+        else {
+            self.wheels[0].ang %= 2.0 * PI;
+            self.wheels[1].ang %= 2.0 * PI;
         }
 
         // gas
-        let do_gas = |frame: &mut Body, wheel: &mut Body, torque: f32| {
-            wheel.torque += torque;
-            frame.torque -= torque;
+        let wheel = &mut self.wheels[0];
+        if is_key_down(KeyCode::Up) && wheel.ang_vel < MAX_SPEED {
+            wheel.torque += GAS;
+            self.frame.torque -= GAS;
             // XXX: is this correct?
             // let arm = wheel.pos - frame.pos;
             // frame.force += torque * arm.perp() / arm.length_squared();
-        };
-
-        if is_key_down(KeyCode::C) && self.wheels[0].ang_vel < MAX_SPEED {
-            do_gas(&mut self.frame, &mut self.wheels[0], GAS);
-        }
-        if is_key_down(KeyCode::X) && self.wheels[1].ang_vel > -MAX_SPEED {
-            do_gas(&mut self.frame, &mut self.wheels[1], -GAS);
         }
 
         // suspension
@@ -192,7 +206,6 @@ impl Bike {
         fx::draw_limb(b, self.wheels[1].pos, 3.0, 3.0, c);
 
         // frame
-        let c = Color::from_rgba(130, 130, 130, 255);
         let v = |x: i32, y: i32| self.frame.pos + vec2(x as f32, y as f32).rotate(rot);
         fx::draw_polygon(
             &[
@@ -206,11 +219,12 @@ impl Bike {
                 v(-17, -7),
                 v(-10, -7),
             ],
-            Color::from_rgba(80, 60, 60, 255),
+            Color::from_rgba(70, 60, 50, 255),
         );
 
         // rider
         if true {
+            let c = Color::from_rgba(130, 130, 130, 255);
             let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
                 let p = self.frame.pos + vec2(x1 as f32, y1 as f32).rotate(rot);
                 let q = self.frame.pos + vec2(x2 as f32, y2 as f32).rotate(rot);
@@ -313,6 +327,11 @@ impl World {
     }
 
     fn update(&mut self, dt: f32) {
+
+        if is_key_down(KeyCode::Enter) {
+            *self = Self::new();
+        }
+
         self.bike.update(dt, &self.walls);
     }
 
