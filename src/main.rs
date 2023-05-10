@@ -46,7 +46,6 @@ fn update_frame(frame: &mut Body, dt: f32) {
     frame.ang_vel += frame.torque / FRAME_INERTIA * dt;
     frame.vel += frame.force / FRAME_MASS * dt;
     frame.ang += frame.ang_vel * dt;
-    frame.ang %= 2.0 * PI;
     frame.pos += frame.vel * dt;
 }
 
@@ -68,11 +67,18 @@ fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<CollisionInfo>) {
     wheel.pos += wheel.vel * dt;
 }
 
+enum Direction {
+    Right,
+    Left,
+}
 struct Bike {
     frame: Body,
     wheels: [Body; 2],
     breaking: bool,
     break_angles: [f32; 2],
+    dir: Direction,
+    dir_lerp: f32,
+    dir_toggling: bool,
 }
 impl Bike {
     fn new(pos: Vec2) -> Bike {
@@ -93,12 +99,29 @@ impl Bike {
             ],
             breaking: false,
             break_angles: [0.0; 2],
+            dir: Direction::Right,
+            dir_lerp: 1.0,
+            dir_toggling: false,
         }
     }
 
     fn update(&mut self, dt: f32, walls: &Vec<Wall>) {
 
-        // calc forces
+        // toggle dir
+        let dir_toggling = is_key_down(KeyCode::Space);
+        if dir_toggling && !self.dir_toggling {
+            self.dir = match self.dir {
+                Direction::Right => Direction::Left,
+                Direction::Left => Direction::Right,
+            };
+        }
+        self.dir_toggling = dir_toggling;
+        self.dir_lerp = match self.dir {
+            Direction::Right => (1.0_f32).min(self.dir_lerp + dt * 20.0),
+            Direction::Left => (-1.0_f32).max(self.dir_lerp - dt * 20.0),
+        };
+
+        // reset forces
         self.frame.torque = 0.0;
         self.frame.force = vec2(0.0, GRAVITY * FRAME_MASS);
         self.wheels[0].torque = 0.0;
@@ -127,27 +150,30 @@ impl Bike {
                 self.break_angles[i] = wheel.ang - self.frame.ang;
             }
         }
-        self.breaking = breaking;
         if breaking {
             for (i, wheel) in self.wheels.iter_mut().enumerate() {
                 let da = wheel.ang - self.frame.ang - self.break_angles[i];
                 let dv = wheel.ang_vel - self.frame.ang_vel;
-
                 let torque = da * 60000.0 + dv * 40000.0;
                 wheel.torque -= torque;
                 self.frame.torque += torque;
             }
-        }
-        else {
+        } else {
+            // wrap angles
+            self.frame.ang %= 2.0 * PI;
             self.wheels[0].ang %= 2.0 * PI;
             self.wheels[1].ang %= 2.0 * PI;
         }
+        self.breaking = breaking;
 
         // gas
-        let wheel = &mut self.wheels[0];
+        let (wheel, sign) = match self.dir {
+            Direction::Right => (&mut self.wheels[0], 1.0),
+            Direction::Left => (&mut self.wheels[1], -1.0),
+        };
         if is_key_down(KeyCode::Up) && wheel.ang_vel < MAX_SPEED {
-            wheel.torque += GAS;
-            self.frame.torque -= GAS;
+            wheel.torque += GAS * sign;
+            self.frame.torque -= GAS * sign;
             // XXX: is this correct?
             // let arm = wheel.pos - frame.pos;
             // frame.force += torque * arm.perp() / arm.length_squared();
@@ -197,27 +223,33 @@ impl Bike {
             fx::draw_wheel(w.pos, w.ang, WHEEL_R, c);
         }
 
-        let rot = Vec2::from_angle(self.frame.ang);
+        let trans = Affine2::from_scale_angle_translation(
+            vec2(self.dir_lerp, 1.0), //
+            self.frame.ang,
+            self.frame.pos,
+        );
+        let t = |x: i32, y: i32| trans.transform_point2(vec2(x as f32, y as f32));
+
         // springs
         let c = Color::from_rgba(140, 80, 70, 255);
-        let a = self.frame.pos + vec2(0.0, 9.0).rotate(rot);
-        let b = self.frame.pos + vec2(12.0, -2.0).rotate(rot);
-        fx::draw_limb(a, self.wheels[0].pos, 3.0, 3.0, c);
-        fx::draw_limb(b, self.wheels[1].pos, 3.0, 3.0, c);
+
+        let w0 = self.wheels[0].pos.lerp(self.wheels[1].pos, 0.5 - self.dir_lerp * 0.5);
+        let w1 = self.wheels[0].pos.lerp(self.wheels[1].pos, 0.5 + self.dir_lerp * 0.5);
+        fx::draw_limb(t(0, 9), w0, 3.0, 3.0, c);
+        fx::draw_limb(t(12, -1), w1, 3.0, 3.0, c);
 
         // frame
-        let v = |x: i32, y: i32| self.frame.pos + vec2(x as f32, y as f32).rotate(rot);
         fx::draw_polygon(
             &[
-                v(2, -3),
-                v(9, -9),
-                v(14, -4),
-                v(1, 11),
-                v(-1, 11),
-                v(-11, 0),
-                v(-17, -2),
-                v(-17, -7),
-                v(-10, -7),
+                t(2, -3),
+                t(9, -9),
+                t(14, -4),
+                t(1, 11),
+                t(-1, 11),
+                t(-11, 0),
+                t(-17, -2),
+                t(-17, -7),
+                t(-10, -7),
             ],
             Color::from_rgba(70, 60, 50, 255),
         );
@@ -226,12 +258,10 @@ impl Bike {
         if true {
             let c = Color::from_rgba(130, 130, 130, 255);
             let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
-                let p = self.frame.pos + vec2(x1 as f32, y1 as f32).rotate(rot);
-                let q = self.frame.pos + vec2(x2 as f32, y2 as f32).rotate(rot);
-                fx::draw_limb(p, q, w, v, c);
+                fx::draw_limb(t(x1, y1), t(x2, y2), w, v, c);
             };
             // head
-            let q = self.frame.pos + vec2(0.0, -21.0).rotate(rot);
+            let q = t(0, -21);
             draw_poly(q.x, q.y, 16, 4.5, self.frame.ang * (180.0 / PI), c);
             // body
             limb(-2, -16, -10, -9, 6.0, 6.0, c);
@@ -327,7 +357,6 @@ impl World {
     }
 
     fn update(&mut self, dt: f32) {
-
         if is_key_down(KeyCode::Enter) {
             *self = Self::new();
         }
