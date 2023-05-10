@@ -11,9 +11,70 @@ fn vert(p: Vec2, color: Color) -> Vert {
     }
 }
 
-// pub fn draw_wheel(p: Vec2, ) {
+// triangle fan
+// TODO: handle all concave polygons
+pub fn draw_polygon(points: &[Vec2], color: Color) {
+    let mut iter = points.iter().map(|p| vert(*p, color));
+    let mut vertices = vec![
+        iter.next().unwrap(),
+        iter.next().unwrap(), //
+    ];
+    let mut indices = vec![];
+    for (i, v) in iter.enumerate() {
+        let i = i as u16;
+        vertices.push(v);
+        indices.extend_from_slice(&[0, i + 1, i + 2]);
+    }
+    draw_mesh(&Mesh {
+        vertices,
+        indices,
+        texture: None,
+    });
+}
 
-// }
+pub fn draw_wheel(pos: Vec2, ang: f32, radius: f32, color: Color) {
+    const N: u16 = 7;
+
+    const W: f32 = 2.0;
+    let radius = radius - W;
+    let mut vertices = vec![];
+    let mut indices = vec![];
+
+    for i in 0..=N {
+        let f = i as f32 / N as f32 * 2.0 * PI;
+        let n = Vec2::from_angle(ang + f);
+        let f = (i as f32 - 0.5) / N as f32 * 2.0 * PI;
+        let b1 = Vec2::from_angle(ang + f) * W;
+        let f = (i as f32 + 0.5) / N as f32 * 2.0 * PI;
+        let b2 = Vec2::from_angle(ang + f) * W;
+
+        vertices.push(vert(pos + n * radius + b1, color));
+        vertices.push(vert(pos + n * radius, color));
+        vertices.push(vert(pos + n * radius + b2, color));
+
+        if i > 0 {
+            indices.extend_from_slice(&[
+                i * 3 - 3,
+                i * 3 - 2,
+                i * 3 - 1,
+                //
+                i * 3 - 2,
+                i * 3 - 1,
+                i * 3,
+                //
+                i * 3 - 2,
+                i * 3,
+                i * 3 + 1,
+            ])
+        }
+    }
+
+    draw_mesh(&Mesh {
+        vertices,
+        indices,
+        texture: None,
+    });
+}
 
 pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
     const N: u16 = 8;
@@ -28,23 +89,20 @@ pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
     let a1 = PI - alpha + beta;
     let a2 = 2.0 * PI - alpha - beta;
 
-    let mut mesh = Mesh {
-        vertices: vec![
-            vert(p, c), //
-            vert(q, c),
-        ],
-        indices: vec![],
-        texture: None,
-    };
+    let mut vertices = vec![
+        vert(p, c), //
+        vert(q, c),
+    ];
+    let mut indices = vec![];
 
     for i in 0..=N {
         let m = i as f32 / N as f32;
         let a = a1 * (1.0 - m) + a2 * m;
         let pp = p + Vec2::from_angle(a) * w;
         draw_line(p.x, p.y, pp.x, pp.y, 1.0, c);
-        mesh.vertices.push(vert(pp, c));
+        vertices.push(vert(pp, c));
         if i > 0 {
-            mesh.indices.extend_from_slice(&[
+            indices.extend_from_slice(&[
                 0, //
                 i + 1,
                 i + 2,
@@ -58,9 +116,9 @@ pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
         let a = a2 * (1.0 - m) + a1 * m;
         let qq = q + Vec2::from_angle(a) * v;
         draw_line(q.x, q.y, qq.x, qq.y, 1.0, c);
-        mesh.vertices.push(vert(qq, c));
+        vertices.push(vert(qq, c));
         if i > 0 {
-            mesh.indices.extend_from_slice(&[
+            indices.extend_from_slice(&[
                 1, //
                 N + i + 2,
                 N + i + 3,
@@ -68,7 +126,7 @@ pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
         }
     }
 
-    mesh.indices.extend_from_slice(&[
+    indices.extend_from_slice(&[
         0,
         1,
         2, //
@@ -83,5 +141,9 @@ pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
         N + 2,
     ]);
 
-    draw_mesh(&mesh);
+    draw_mesh(&Mesh {
+        vertices,
+        indices,
+        texture: None,
+    });
 }

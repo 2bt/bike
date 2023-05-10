@@ -6,7 +6,7 @@ mod fx;
 const W: f32 = 480.0;
 const H: f32 = 270.0;
 
-struct Line(Vec2, Vec2);
+struct Wall(Vec2, Vec2);
 
 struct Body {
     mass: f32,
@@ -37,7 +37,7 @@ impl Default for Body {
 }
 
 struct World {
-    lines: Vec<Line>,
+    walls: Vec<Wall>,
     bike: Body,
     wheel1: Body,
     wheel2: Body,
@@ -95,10 +95,7 @@ impl Body {
     }
     fn update(&mut self, dt: f32, ci: Option<CollisionInfo>) {
         if let Some(ci) = ci {
-            // collision
             self.pos += ci.normal * ci.dist;
-
-            // self.vel -= (1.0 + COR) * ci.normal.dot(self.vel) * ci.normal;
 
             self.ang_vel = ci.normal.perp().dot(self.vel) / WHEEL_R;
             self.torque += ci.normal.perp().dot(self.force) * WHEEL_R;
@@ -122,23 +119,29 @@ const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
 const SUSPENSION: f32 = 700.0;
 const FRICTION: f32 = 40.0;
-const MAX_SPEED: f32 = 20.0;
+const MAX_SPEED: f32 = 44.0;
 const GAS: f32 = 17000.0;
 
 impl World {
     fn new() -> World {
         let mut world = World {
-            lines: vec![
-                Line(vec2(50.0, 200.0), vec2(300.0, 210.0)),
-                Line(vec2(300.0, 210.0), vec2(450.0, 180.0)),
-                Line(vec2(450.0, 180.0), vec2(480.0, 30.0)),
+            walls: vec![
+                Wall(vec2(0.0, 0.0), vec2(0.0, H)),
                 //
-                Line(vec2(0.0, 190.0), vec2(480.0, 190.0)),
+                Wall(vec2(0.0, 240.0), vec2(50.0, 245.0)),
+                //
+                Wall(vec2(50.0, 240.0), vec2(300.0, 250.0)),
+                Wall(vec2(300.0, 250.0), vec2(450.0, 220.0)),
+                Wall(vec2(450.0, 220.0), vec2(480.0, 70.0)),
+
+                Wall(vec2(100.0, 140.0), vec2(200.0, 140.0)),
+                //
+                // Wall(vec2(0.0, 190.0), vec2(480.0, 190.0)),
             ],
             bike: Body {
                 mass: 20.0,
                 inertia: 5000.0,
-                pos: vec2(W * 0.5, H * 0.6),
+                pos: vec2(150.0, 100.0),
                 ..Default::default()
             },
             wheel1: Body {
@@ -159,7 +162,7 @@ impl World {
 
     fn check_wheel_collision(&self, wheel: &Body) -> Option<CollisionInfo> {
         let mut colli: Option<CollisionInfo> = None;
-        for Line(p, q) in self.lines.iter() {
+        for Wall(p, q) in self.walls.iter() {
             if let Some(ci) = circle_line_collision(wheel.pos, WHEEL_R, *p, *q) {
                 colli = Some(match colli {
                     Some(cc) if cc.dist > ci.dist => cc,
@@ -244,71 +247,61 @@ impl World {
         clear_background(Color::new(0.05, 0.05, 0.05, 1.0));
 
         // walls
-        for Line(p, q) in self.lines.iter() {
-            draw_line(q.x, q.y, p.x, p.y, 2.0, DARKGREEN);
+        for Wall(p, q) in self.walls.iter() {
+            fx::draw_limb(*q, *p, 2.0, 2.0, DARKGREEN);
         }
 
         // wheels
         let c = Color::from_rgba(130, 130, 130, 255);
-        draw_poly_lines(
-            self.wheel1.pos.x,
-            self.wheel1.pos.y,
-            6,
-            WHEEL_R - 1.0,
-            self.wheel1.ang.to_degrees(),
-            2.0,
-            c,
-        );
-        draw_poly_lines(
-            self.wheel2.pos.x,
-            self.wheel2.pos.y,
-            6,
-            WHEEL_R - 1.0,
-            self.wheel2.ang.to_degrees(),
-            2.0,
-            c,
-        );
+        fx::draw_wheel(self.wheel1.pos, self.wheel1.ang, WHEEL_R, c);
+        fx::draw_wheel(self.wheel2.pos, self.wheel2.ang, WHEEL_R, c);
 
         let rot = Vec2::from_angle(self.bike.ang);
         // springs
         let c = Color::from_rgba(140, 80, 70, 255);
         let a = self.bike.pos + vec2(0.0, 9.0).rotate(rot);
         let b = self.bike.pos + vec2(12.0, -2.0).rotate(rot);
-        draw_line(a.x, a.y, self.wheel1.pos.x, self.wheel1.pos.y, 3.0, c);
-        draw_line(b.x, b.y, self.wheel2.pos.x, self.wheel2.pos.y, 3.0, c);
+        fx::draw_limb(a, self.wheel1.pos, 3.0, 3.0, c);
+        fx::draw_limb(b, self.wheel2.pos, 3.0, 3.0, c);
 
         // bike
-        let c = Color::from_rgba(80, 60, 60, 255);
-        let line = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32| {
-            let p = self.bike.pos + vec2(x1 as f32, y1 as f32).rotate(rot);
-            let q = self.bike.pos + vec2(x2 as f32, y2 as f32).rotate(rot);
-            draw_line(p.x, p.y, q.x, q.y, w, c);
-        };
-        line(12, -6, -2, 9, 7.0);
-        line(-12, -4, 3, 9, 7.0);
-        line(-10, -3, -17, -4, 7.0);
-        line(9, 0, -17, -4, 6.0);
+        let c = Color::from_rgba(130, 130, 130, 255);
+        let v = |x: i32, y: i32| self.bike.pos + vec2(x as f32, y as f32).rotate(rot);
+        fx::draw_polygon(
+            &[
+                v(2, -3),
+                v(9, -9),
+                v(14, -4),
+                v(1, 11),
+                v(-1, 11),
+                v(-11, 0),
+                v(-17, -2),
+                v(-17, -7),
+                v(-10, -7),
+            ],
+            Color::from_rgba(80, 60, 60, 255),
+        );
 
         // rider
-        let c = Color::from_rgba(130, 130, 130, 255);
-        let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
-            let p = self.bike.pos + vec2(x1 as f32, y1 as f32).rotate(rot);
-            let q = self.bike.pos + vec2(x2 as f32, y2 as f32).rotate(rot);
-            fx::draw_limb(p, q, w, v, c);
-        };
-        // head
-        let q = self.bike.pos + vec2(0.0, -21.0).rotate(rot);
-        draw_poly(q.x, q.y, 16, 5.0, self.bike.ang * (180.0 / PI), c);
-        // body
-        limb(-2, -16, -10, -9, 6.0, 6.0, c);
-        // leg
-        limb(-10, -9, -2, -3, 6.0, 4.0, c);
-        limb(-2, -3, -1, 6, 4.0, 3.0, c);
-        limb(-1, 6, 2, 6, 3.0, 2.0, c);
-        // arm
-        let c = Color::from_rgba(20, 130, 50, 255);
-        limb(-1, -15, 2, -7, 4.0, 3.0, c);
-        limb(2, -7, 10, -6, 3.0, 2.0, c);
+        if true {
+            let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
+                let p = self.bike.pos + vec2(x1 as f32, y1 as f32).rotate(rot);
+                let q = self.bike.pos + vec2(x2 as f32, y2 as f32).rotate(rot);
+                fx::draw_limb(p, q, w, v, c);
+            };
+            // head
+            let q = self.bike.pos + vec2(0.0, -21.0).rotate(rot);
+            draw_poly(q.x, q.y, 16, 4.5, self.bike.ang * (180.0 / PI), c);
+            // body
+            limb(-2, -16, -10, -9, 6.0, 6.0, c);
+            // leg
+            limb(-10, -9, -2, -3, 6.0, 4.0, c);
+            limb(-2, -3, -1, 6, 4.0, 3.0, c);
+            limb(-1, 6, 2, 6, 3.0, 2.0, c);
+            // arm
+            limb(-1, -15, 2, -8, 4.0, 3.0, c);
+            limb(2, -8, 10, -7, 3.0, 2.5, c);
+        }
     }
 }
 
