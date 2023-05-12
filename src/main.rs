@@ -363,9 +363,26 @@ impl Game {
     }
 
     fn draw(&self) {
-        clear_background(Color::new(0.05, 0.05, 0.05, 1.0));
+        clear_background(Color::from_rgba(10, 12, 15, 255));
         self.level.draw();
         self.bike.draw();
+
+        // labels
+        let f = macroquad::text::camera_font_scale(8.0);
+        let x = W - 100.0;
+        let mut y = H - 30.0;
+        let mut txt = |text| {
+            draw_text_ex(text, x, y, TextParams{
+                font_size: f.0,
+                font_scale: f.1,
+                ..TextParams::default()
+            });
+            y += 8.0;
+        };
+        txt("[UP]    - accelerate");
+        txt("[DOWN]  - break");
+        txt("[SPACE] - toggle direction");
+        txt("[ENTER] - reset position");
     }
 }
 

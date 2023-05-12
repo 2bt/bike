@@ -54,12 +54,13 @@ impl Level {
         }
 
         // generate mesh
+        let color = Color::from_rgba(30, 100, 50, 255);
         for wall in level.walls.iter() {
             let n = level.mesh.vertices.len();
             level
                 .mesh
                 .vertices
-                .extend(wall.points.iter().map(|p| fx::vert(*p, DARKGREEN)));
+                .extend(wall.points.iter().map(|p| fx::vert(*p, color)));
             let indices = fx::triangulate_polygon(&wall.points);
             level
                 .mesh
