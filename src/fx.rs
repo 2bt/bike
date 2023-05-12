@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 
 type Vert = macroquad::models::Vertex;
 
-fn vert(p: Vec2, color: Color) -> Vert {
+pub fn vert(p: Vec2, color: Color) -> Vert {
     Vert {
         position: p.extend(0.0),
         uv: vec2(0.0, 0.0),
@@ -36,7 +36,7 @@ pub fn draw_wheel(pos: Vec2, ang: f32, radius: f32, color: Color) {
     const N: u16 = 7;
 
     const W: f32 = 2.0;
-    let radius = radius - W;
+    let radius = radius - W * 0.5;
     let mut vertices = vec![];
     let mut indices = vec![];
 
@@ -146,4 +146,78 @@ pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
         indices,
         texture: None,
     });
+}
+
+use std::cmp::Ordering;
+
+fn orientation(p: Vec2, q: Vec2, r: Vec2) -> Ordering {
+    let val = (q - p).perp_dot(r - q);
+    if val == 0.0 {
+        Ordering::Equal
+    } else if val > 0.0 {
+        Ordering::Greater
+    } else {
+        Ordering::Less
+    }
+}
+fn is_inside_triangle(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
+    let o1 = orientation(p, a, b);
+    let o2 = orientation(p, b, c);
+    let o3 = orientation(p, c, a);
+    o1 == o2 && o2 == o3
+}
+fn is_ear(polygon: &[Vec2], todo: &[usize], i: usize) -> bool {
+    let n = todo.len();
+
+    let ear_i = todo[i];
+    let prev_i = todo[if i == 0 { n - 1 } else { i - 1 }];
+    let next_i = todo[if i == n - 1 { 0 } else { i + 1 }];
+
+    let ear_p = polygon[ear_i];
+    let prev_p = polygon[prev_i];
+    let next_p = polygon[next_i];
+
+    if orientation(prev_p, ear_p, next_p) != Ordering::Less {
+        return false;
+    }
+
+    for j in todo.iter() {
+        let j = *j;
+        if (j == prev_i) || (j == ear_i) || (j == next_i) {
+            continue;
+        }
+        let q = polygon[j];
+        if is_inside_triangle(q, prev_p, ear_p, next_p) {
+            return false;
+        }
+    }
+
+    true
+}
+
+pub fn triangulate_polygon(polygon: &[Vec2]) -> Vec<u16> {
+    if polygon.len() < 3 {
+        return Vec::new();
+    }
+
+    let mut indices: Vec<u16> = Vec::new();
+    let mut todo: Vec<usize> = (0..polygon.len()).collect();
+
+    while todo.len() > 2 {
+        let num_remaining = todo.len();
+        for i in 0..num_remaining {
+            if is_ear(polygon, &todo, i) {
+                let n = todo.len();
+                let ear_i = todo[i];
+                let prev_i = todo[if i == 0 { n - 1 } else { i - 1 }];
+                let next_i = todo[if i == n - 1 { 0 } else { i + 1 }];
+                todo.remove(i);
+                indices.push(prev_i as u16);
+                indices.push(ear_i as u16);
+                indices.push(next_i as u16);
+                break;
+            }
+        }
+    }
+    indices
 }

@@ -2,6 +2,7 @@ use macroquad::prelude::*;
 use std::f32::consts::PI;
 
 mod fx;
+mod level;
 
 const W: f32 = 480.0;
 const H: f32 = 270.0;
@@ -10,7 +11,7 @@ const GRAVITY: f32 = 100.0;
 const FRAME_MASS: f32 = 20.0;
 const FRAME_INERTIA: f32 = 5000.0;
 const WHEEL_MASS: f32 = 1.0;
-const WHEEL_INERTIA: f32 = 100.0;
+const WHEEL_INERTIA: f32 = 50.0;
 const WHEEL_R: f32 = 8.0;
 const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
@@ -19,7 +20,67 @@ const FRICTION: f32 = 40.0;
 const MAX_SPEED: f32 = 50.0;
 const GAS: f32 = 17000.0;
 
-struct Wall(Vec2, Vec2);
+
+struct CollisionInfo {
+    normal: Vec2,
+    dist: f32,
+}
+
+fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionInfo> {
+    let pq = q - p;
+    let pm = m - p;
+    let e = pq.dot(pm);
+    if e < 0.0 {
+        let dist = pm.length();
+        if dist < r {
+            return Some(CollisionInfo {
+                normal: pm.normalize(),
+                dist: r - dist,
+            });
+        }
+    } else if e < pq.length_squared() {
+        let mut norm = pq.perp().normalize();
+        let mut dist = norm.dot(pm);
+        if dist < 0.0 {
+            dist = -dist;
+            norm = -norm;
+        }
+        if dist < r {
+            return Some(CollisionInfo {
+                normal: norm,
+                dist: r - dist,
+            });
+        }
+    } else {
+        let qm = m - q;
+        let dist = qm.length();
+        if dist < r {
+            return Some(CollisionInfo {
+                normal: qm.normalize(),
+                dist: r - dist,
+            });
+        }
+    }
+    None
+}
+
+impl level::Level {
+    fn wheel_collision(&self, wheel: &Body) -> Option<CollisionInfo> {
+        let mut colli: Option<CollisionInfo> = None;
+        for wall in self.walls.iter() {
+            for (i, p) in wall.points.iter().enumerate() {
+                let q = wall.points[(i + 1) % wall.points.len()];
+                if let Some(ci) = circle_line_collision(wheel.pos, WHEEL_R, *p, q) {
+                    colli = Some(match colli {
+                        Some(cc) if cc.dist > ci.dist => cc,
+                        _ => ci,
+                    })
+                }
+            }
+        }
+        colli
+    }
+}
 
 struct Body {
     pos: Vec2,
@@ -53,8 +114,8 @@ fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<CollisionInfo>) {
     if let Some(ci) = ci {
         wheel.pos += ci.normal * ci.dist;
 
-        wheel.ang_vel = ci.normal.perp().dot(wheel.vel) / WHEEL_R;
-        wheel.torque += ci.normal.perp().dot(wheel.force) * WHEEL_R;
+        wheel.ang_vel = ci.normal.perp_dot(wheel.vel) / WHEEL_R;
+        wheel.torque += ci.normal.perp_dot(wheel.force) * WHEEL_R;
 
         wheel.ang_vel += wheel.torque / WHEEL_INERTIA * dt;
         wheel.vel = ci.normal.perp() * wheel.ang_vel * WHEEL_R;
@@ -71,6 +132,7 @@ enum Direction {
     Right,
     Left,
 }
+
 struct Bike {
     frame: Body,
     wheels: [Body; 2],
@@ -80,6 +142,7 @@ struct Bike {
     dir_lerp: f32,
     dir_toggling: bool,
 }
+
 impl Bike {
     fn new(pos: Vec2) -> Bike {
         Bike {
@@ -105,8 +168,7 @@ impl Bike {
         }
     }
 
-    fn update(&mut self, dt: f32, walls: &Vec<Wall>) {
-
+    fn update(&mut self, dt: f32, level: &level::Level) {
         // toggle dir
         let dir_toggling = is_key_down(KeyCode::Space);
         if dir_toggling && !self.dir_toggling {
@@ -193,7 +255,7 @@ impl Bike {
 
             wheel.force += force;
             self.frame.force -= force;
-            self.frame.torque += force.perp().dot(arm);
+            self.frame.torque += force.perp_dot(arm);
 
             // friction
             // XXX: is this arm right?
@@ -206,23 +268,17 @@ impl Bike {
 
             wheel.force += force;
             self.frame.force -= force;
-            self.frame.torque += force.perp().dot(arm);
+            self.frame.torque += force.perp_dot(arm);
         }
 
         update_frame(&mut self.frame, dt);
         for w in self.wheels.iter_mut() {
-            let ci = check_wheel_collision(w, walls);
+            let ci = level.wheel_collision(w);
             update_wheel(w, dt, ci);
         }
     }
 
     fn draw(&self) {
-        // wheels
-        let c = Color::from_rgba(130, 130, 130, 255);
-        for w in self.wheels.iter() {
-            fx::draw_wheel(w.pos, w.ang, WHEEL_R, c);
-        }
-
         let trans = Affine2::from_scale_angle_translation(
             vec2(self.dir_lerp, 1.0), //
             self.frame.ang,
@@ -230,11 +286,17 @@ impl Bike {
         );
         let t = |x: i32, y: i32| trans.transform_point2(vec2(x as f32, y as f32));
 
+        // wheels
+        let c = Color::from_rgba(130, 130, 130, 255);
+        for w in self.wheels.iter() {
+            fx::draw_wheel(w.pos, w.ang, WHEEL_R, c);
+        }
+
         // springs
         let c = Color::from_rgba(140, 80, 70, 255);
-
-        let w0 = self.wheels[0].pos.lerp(self.wheels[1].pos, 0.5 - self.dir_lerp * 0.5);
-        let w1 = self.wheels[0].pos.lerp(self.wheels[1].pos, 0.5 + self.dir_lerp * 0.5);
+        let lerp = 0.5 + (self.dir_lerp * 0.5 * PI).sin() * 0.5;
+        let w0 = self.wheels[1].pos.lerp(self.wheels[0].pos, lerp);
+        let w1 = self.wheels[0].pos.lerp(self.wheels[1].pos, lerp);
         fx::draw_limb(t(0, 9), w0, 3.0, 3.0, c);
         fx::draw_limb(t(12, -1), w1, 3.0, 3.0, c);
 
@@ -255,129 +317,61 @@ impl Bike {
         );
 
         // rider
-        if true {
-            let c = Color::from_rgba(130, 130, 130, 255);
-            let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
-                fx::draw_limb(t(x1, y1), t(x2, y2), w, v, c);
-            };
-            // head
-            let q = t(0, -21);
-            draw_poly(q.x, q.y, 16, 4.5, self.frame.ang * (180.0 / PI), c);
-            // body
-            limb(-2, -16, -10, -9, 6.0, 6.0, c);
-            // leg
-            limb(-10, -9, -2, -3, 6.0, 4.0, c);
-            limb(-2, -3, -1, 6, 4.0, 3.0, c);
-            limb(-1, 6, 2, 6, 3.0, 2.0, c);
-            // arm
-            limb(-1, -15, 2, -8, 4.0, 3.0, c);
-            limb(2, -8, 10, -7, 3.0, 2.5, c);
-        }
+        let c = Color::from_rgba(130, 130, 130, 255);
+        let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
+            fx::draw_limb(t(x1, y1), t(x2, y2), w, v, c);
+        };
+        // head
+        let q = t(0, -21);
+        draw_poly(q.x, q.y, 16, 4.5, self.frame.ang * (180.0 / PI), c);
+        // body
+        limb(-2, -16, -10, -9, 6.0, 6.0, c);
+        // leg
+        limb(-10, -9, -2, -3, 6.0, 4.0, c);
+        limb(-2, -3, -1, 6, 4.0, 3.0, c);
+        limb(-1, 6, 2, 6, 3.0, 2.0, c);
+        // arm
+        limb(-1, -15, 2, -8, 4.0, 3.0, c);
+        limb(2, -8, 10, -7, 3.0, 2.5, c);
     }
 }
 
-struct CollisionInfo {
-    normal: Vec2,
-    dist: f32,
-}
-
-fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionInfo> {
-    let pq = q - p;
-    let pm = m - p;
-    let e = pq.dot(pm);
-    if e < 0.0 {
-        let dist = pm.length();
-        if dist < r {
-            return Some(CollisionInfo {
-                normal: pm.normalize(),
-                dist: r - dist,
-            });
-        }
-    } else if e < pq.length_squared() {
-        let mut norm = pq.perp().normalize();
-        let mut dist = norm.dot(pm);
-        if dist < 0.0 {
-            dist = -dist;
-            norm = -norm;
-        }
-        if dist < r {
-            return Some(CollisionInfo {
-                normal: norm,
-                dist: r - dist,
-            });
-        }
-    } else {
-        let qm = m - q;
-        let dist = qm.length();
-        if dist < r {
-            return Some(CollisionInfo {
-                normal: qm.normalize(),
-                dist: r - dist,
-            });
-        }
-    }
-    None
-}
-
-fn check_wheel_collision(wheel: &Body, walls: &Vec<Wall>) -> Option<CollisionInfo> {
-    let mut colli: Option<CollisionInfo> = None;
-    for Wall(p, q) in walls.iter() {
-        if let Some(ci) = circle_line_collision(wheel.pos, WHEEL_R, *p, *q) {
-            colli = Some(match colli {
-                Some(cc) if cc.dist > ci.dist => cc,
-                _ => ci,
-            })
-        }
-    }
-    colli
-}
-
-struct World {
-    walls: Vec<Wall>,
+struct Game {
+    level: level::Level,
     bike: Bike,
 }
 
-impl World {
-    fn new() -> World {
-        World {
-            walls: vec![
-                Wall(vec2(0.0, 0.0), vec2(0.0, H)),
-                //
-                Wall(vec2(0.0, 240.0), vec2(50.0, 245.0)),
-                //
-                Wall(vec2(50.0, 240.0), vec2(300.0, 250.0)),
-                Wall(vec2(300.0, 250.0), vec2(450.0, 220.0)),
-                Wall(vec2(450.0, 220.0), vec2(480.0, 70.0)),
-                Wall(vec2(100.0, 140.0), vec2(200.0, 140.0)),
-                //
-                // Wall(vec2(0.0, 190.0), vec2(480.0, 190.0)),
-            ],
-            bike: Bike::new(vec2(150.0, 100.0)),
-        }
+impl Game {
+    fn new() -> Result<Game, ()> {
+        let level = level::Level::load("assets/level1.txt")?;
+        let start = level.start;
+
+        Ok(Game {
+            level: level,
+            bike: Bike::new(start),
+        })
     }
 
     fn update(&mut self, dt: f32) {
+
+        // reset
         if is_key_down(KeyCode::Enter) {
-            *self = Self::new();
+            self.bike = Bike::new(self.level.start);
         }
 
-        self.bike.update(dt, &self.walls);
+        self.bike.update(dt, &self.level);
     }
 
     fn draw(&self) {
         clear_background(Color::new(0.05, 0.05, 0.05, 1.0));
-
-        for Wall(p, q) in self.walls.iter() {
-            fx::draw_limb(*q, *p, 2.0, 2.0, DARKGREEN);
-        }
-
+        self.level.draw();
         self.bike.draw();
     }
 }
 
 #[macroquad::main("Bike")]
-async fn main() {
-    let mut world = World::new();
+async fn main() -> Result<(), ()> {
+    let mut game = Game::new()?;
 
     let mut time = 0.0;
     let mut physics_time = 0.0;
@@ -391,17 +385,17 @@ async fn main() {
         // update
 
         time += get_frame_time();
-        let dt = 0.0001;
+        let dt = 0.0002;
         while physics_time + dt < time {
             physics_time += dt;
-            world.update(dt);
+            game.update(dt);
         }
 
         // draw
         let ratio = screen_width() / screen_height();
         let cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, W, W / ratio));
         set_camera(&cam);
-        world.draw();
+        game.draw();
 
         // // draw canvas
         // let ratio = screen_width() / screen_height();
