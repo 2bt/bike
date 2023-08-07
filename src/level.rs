@@ -25,7 +25,7 @@ fn fix_points(points: &mut Vec<Vec2>) {
 }
 
 impl Level {
-    pub fn load(path: &str) -> Result<Level, std::io::Error> {
+    pub async fn load(path: &str) -> Result<Level, std::io::Error> {
         let mut level = Level {
             walls: vec![],
             start: vec2(0.0, 0.0),
@@ -36,9 +36,8 @@ impl Level {
             },
         };
 
-        let in_file = std::fs::File::open(path)?;
-        let reader = std::io::BufReader::new(in_file);
-        let json: serde_json::Value = serde_json::from_reader(reader)?;
+        let string = macroquad::file::load_string(path).await.unwrap();
+        let json: serde_json::Value = serde_json::from_str(&string)?;
 
         for layer in json["layers"].as_array().unwrap() {
             match layer["name"].as_str().unwrap() {

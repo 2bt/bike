@@ -346,8 +346,8 @@ struct Game {
 
 
 impl Game {
-    fn new() -> Game {
-        let level = level::Level::load("assets/level1.tmj").unwrap();
+    async fn new() -> Game {
+        let level = level::Level::load("assets/level1.tmj").await.unwrap();
         let start = level.start;
         Game {
             level: level,
@@ -396,8 +396,7 @@ impl Game {
 
 #[macroquad::main("Bike")]
 async fn main() -> Result<(), ()> {
-    info!("hello world");
-    let mut game = Game::new();
+    let mut game = Game::new().await;
 
     let mut time = 0.0;
     let mut physics_time = 0.0;
