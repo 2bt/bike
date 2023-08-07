@@ -418,9 +418,17 @@ async fn main() -> Result<(), ()> {
 
         // draw
         let ratio = screen_width() / screen_height();
-        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, W, W / ratio));
+        let rect = if ratio > W / H {
+            let w = H * ratio;
+            Rect::new((w - W) * -0.5, 0.0, w, H)
+        } else {
+            let h = W / ratio;
+            Rect::new(0.0, (h - H) * -0.5, W, h)
+        };
+        let mut cam = Camera2D::from_display_rect(rect);
         cam.zoom.y = cam.zoom.y.abs();
         set_camera(&cam);
+
         game.draw();
 
         // // draw canvas
