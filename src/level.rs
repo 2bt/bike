@@ -12,25 +12,20 @@ pub struct Level {
     pub mesh: Mesh,
 }
 
-pub enum Line {
-    Wall(Wall),
-    Start(Vec2),
-}
-
-peg::parser! {
-    grammar parser() for str {
-        rule _() = quiet!{[' '|'\t']*}
-        rule number() -> f32 = _ n:$("-"?['0'..='9']+) { n.parse().unwrap() }
-        rule point() -> Vec2 = _ "(" x:number() y:number() _ ")" { vec2(x, y) }
-        rule points() -> Vec<Vec2> = "[" p:point()* _ "]" { p }
-        pub rule line() -> Line
-            = "wall" _ points:points() { Line::Wall(Wall { points }) }
-            / "start" _ p:point() { Line::Start(p) }
+fn fix_points(points: &mut Vec<Vec2>) {
+    let mut s = 0.0;
+    for i in 0..points.len() {
+        let p = &points[i];
+        let q = &points[(i + 1) % points.len()];
+        s += (q.x - p.x) * (q.y + p.y);
+    }
+    if s < 0.0 {
+        points.reverse();
     }
 }
 
 impl Level {
-    pub fn load(path: &str) -> Result<Level, ()> {
+    pub fn load(path: &str) -> Result<Level, std::io::Error> {
         let mut level = Level {
             walls: vec![],
             start: vec2(0.0, 0.0),
@@ -41,15 +36,46 @@ impl Level {
             },
         };
 
-        // parse file
-        use std::io::BufRead;
-        let file = std::fs::File::open(path).map_err(|_| ())?;
-        for line in std::io::BufReader::new(file).lines() {
-            let line = line.map_err(|_| ())?;
-            match parser::line(line.as_str()) {
-                Ok(Line::Wall(w)) => level.walls.push(w),
-                Ok(Line::Start(p)) => level.start = p,
-                _ => return Err(()),
+        let in_file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(in_file);
+        let json: serde_json::Value = serde_json::from_reader(reader)?;
+
+        for layer in json["layers"].as_array().unwrap() {
+            match layer["name"].as_str().unwrap() {
+                "walls" => {
+                    for o in layer["objects"].as_array().unwrap() {
+                        let mut wall = Wall { points: vec![] };
+                        let pos = vec2(
+                            o["x"].as_f64().unwrap() as f32,
+                            o["y"].as_f64().unwrap() as f32,
+                        );
+                        for p in o["polygon"].as_array().unwrap() {
+                            let p = vec2(
+                                p["x"].as_f64().unwrap() as f32,
+                                p["y"].as_f64().unwrap() as f32,
+                            );
+                            wall.points.push(pos + p);
+                        }
+                        fix_points(&mut wall.points);
+                        level.walls.push(wall);
+                    }
+                },
+                "objects" => {
+                    for o in layer["objects"].as_array().unwrap() {
+                        let name = o["name"].as_str().unwrap();
+                        let pos = vec2(
+                            o["x"].as_f64().unwrap() as f32,
+                            o["y"].as_f64().unwrap() as f32,
+                        );
+                        match name {
+                            "start" => {
+                                level.start = pos;
+                            },
+                            _ => {},
+                        }
+                    }
+                },
+                _ => {},
             }
         }
 
@@ -80,6 +106,5 @@ impl Level {
         //         draw_line(p.x, p.y, q.x, q.y, 1.0, DARKBROWN);
         //     }
         // }
-
     }
 }

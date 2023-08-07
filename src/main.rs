@@ -16,10 +16,13 @@ const WHEEL_R: f32 = 8.0;
 const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
 const SUSPENSION: f32 = 700.0;
-const FRICTION: f32 = 40.0;
+const SUSPENSION_FRICTION: f32 = 40.0;
+// const BREAK: f32 = 60000.0;
+// const BREAK_FRICTION: f32 = 40000.0;
+const BREAK: f32 = 60000.0 * 0.5;
+const BREAK_FRICTION: f32 = 40000.0 * 0.5;
 const MAX_SPEED: f32 = 50.0;
 const GAS: f32 = 17000.0;
-
 
 struct CollisionInfo {
     normal: Vec2,
@@ -216,7 +219,7 @@ impl Bike {
             for (i, wheel) in self.wheels.iter_mut().enumerate() {
                 let da = wheel.ang - self.frame.ang - self.break_angles[i];
                 let dv = wheel.ang_vel - self.frame.ang_vel;
-                let torque = da * 60000.0 + dv * 40000.0;
+                let torque = da * BREAK + dv * BREAK_FRICTION;
                 wheel.torque -= torque;
                 self.frame.torque += torque;
             }
@@ -262,7 +265,7 @@ impl Bike {
             let arm = wheel.pos - self.frame.pos;
 
             let dv = self.frame.vel + self.frame.ang_vel * arm.perp() - wheel.vel;
-            let force = dv * FRICTION;
+            let force = dv * SUSPENSION_FRICTION;
 
             let force = force * 1.0001_f32.powf(force.length());
 
@@ -341,19 +344,18 @@ struct Game {
     bike: Bike,
 }
 
-impl Game {
-    fn new() -> Result<Game, ()> {
-        let level = level::Level::load("assets/level1.txt")?;
-        let start = level.start;
 
-        Ok(Game {
+impl Game {
+    fn new() -> Game {
+        let level = level::Level::load("assets/level1.tmj").unwrap();
+        let start = level.start;
+        Game {
             level: level,
             bike: Bike::new(start),
-        })
+        }
     }
 
     fn update(&mut self, dt: f32) {
-
         // reset
         if is_key_down(KeyCode::Enter) {
             self.bike = Bike::new(self.level.start);
@@ -364,6 +366,7 @@ impl Game {
 
     fn draw(&self) {
         clear_background(Color::from_rgba(10, 12, 15, 255));
+
         self.level.draw();
         self.bike.draw();
 
@@ -372,11 +375,16 @@ impl Game {
         let x = W - 100.0;
         let mut y = H - 30.0;
         let mut txt = |text| {
-            draw_text_ex(text, x, y, TextParams{
-                font_size: f.0,
-                font_scale: f.1,
-                ..TextParams::default()
-            });
+            draw_text_ex(
+                text,
+                x,
+                y,
+                TextParams {
+                    font_size: f.0,
+                    font_scale: f.1,
+                    ..TextParams::default()
+                },
+            );
             y += 8.0;
         };
         txt("[UP]    - accelerate");
@@ -388,7 +396,8 @@ impl Game {
 
 #[macroquad::main("Bike")]
 async fn main() -> Result<(), ()> {
-    let mut game = Game::new()?;
+    info!("hello world");
+    let mut game = Game::new();
 
     let mut time = 0.0;
     let mut physics_time = 0.0;
@@ -410,7 +419,8 @@ async fn main() -> Result<(), ()> {
 
         // draw
         let ratio = screen_width() / screen_height();
-        let cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, W, W / ratio));
+        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, W, W / ratio));
+        cam.zoom.y = cam.zoom.y.abs();
         set_camera(&cam);
         game.draw();
 
