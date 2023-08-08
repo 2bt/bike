@@ -10,6 +10,7 @@ pub struct Level {
     pub walls: Vec<Wall>,
     pub start: Vec2,
     pub mesh: Mesh,
+    material: Material,
 }
 
 fn fix_points(points: &mut Vec<Vec2>) {
@@ -26,6 +27,42 @@ fn fix_points(points: &mut Vec<Vec2>) {
 
 impl Level {
     pub async fn load(path: &str) -> Result<Level, std::io::Error> {
+        let material = load_material(
+            ShaderSource {
+                glsl_vertex: Some(
+                    "#version 100
+precision lowp float;
+attribute vec3 position;
+varying vec2 uv;
+uniform mat4 Model;
+uniform mat4 Projection;
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1);
+    uv = position.xy;
+}",
+                ),
+                glsl_fragment: Some(
+                    "#version 100
+precision lowp float;
+varying vec2 uv;
+uniform sampler2D Texture;
+void main() {
+    vec2 f = fract(uv / 32.0);
+    vec2 a = abs(f * 2.0 - vec2(1.0));
+    float x = pow(max(a.x, a.y), 20.0);
+    gl_FragColor = mix(
+        vec4(0.11, 0.34, 0.22, 1.0),
+        vec4(0.11, 0.4, 0.3, 1.0),
+        x);
+}
+",
+                ),
+                metal_shader: None,
+            },
+            Default::default(),
+        )
+        .unwrap();
+
         let mut level = Level {
             walls: vec![],
             start: vec2(0.0, 0.0),
@@ -34,6 +71,7 @@ impl Level {
                 indices: vec![],
                 texture: None,
             },
+            material,
         };
 
         let string = macroquad::file::load_string(path).await.unwrap();
@@ -58,7 +96,7 @@ impl Level {
                         fix_points(&mut wall.points);
                         level.walls.push(wall);
                     }
-                },
+                }
                 "objects" => {
                     for o in layer["objects"].as_array().unwrap() {
                         let name = o["name"].as_str().unwrap();
@@ -69,12 +107,12 @@ impl Level {
                         match name {
                             "start" => {
                                 level.start = pos;
-                            },
-                            _ => {},
+                            }
+                            _ => {}
                         }
                     }
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
 
@@ -97,7 +135,9 @@ impl Level {
     }
 
     pub fn draw(&self) {
+        gl_use_material(&self.material);
         draw_mesh(&self.mesh);
+        gl_use_default_material();
 
         // for wall in self.walls.iter() {
         //     for (i, p) in wall.points.iter().enumerate() {

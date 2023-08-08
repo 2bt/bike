@@ -339,6 +339,7 @@ impl Bike {
     }
 }
 
+
 struct Game {
     level: level::Level,
     bike: Bike,
@@ -372,8 +373,8 @@ impl Game {
 
         // labels
         let f = macroquad::text::camera_font_scale(8.0);
-        let x = W - 100.0;
-        let mut y = H - 30.0;
+        let x = self.level.start.x + 100.0;
+        let mut y = self.level.start.y + 50.0;
         let mut txt = |text| {
             draw_text_ex(
                 text,
@@ -395,16 +396,11 @@ impl Game {
 }
 
 #[macroquad::main("Bike")]
-async fn main() -> Result<(), ()> {
+async fn main() {
     let mut game = Game::new().await;
 
     let mut time = 0.0;
     let mut physics_time = 0.0;
-
-    // let canvas = render_target(W as u32, H as u32);
-    // canvas.texture.set_filter(FilterMode::Nearest);
-    // let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, W, H));
-    // cam.render_target = Some(canvas);
 
     loop {
         // update
@@ -427,23 +423,11 @@ async fn main() -> Result<(), ()> {
         };
         let mut cam = Camera2D::from_display_rect(rect);
         cam.zoom.y = cam.zoom.y.abs();
+        cam.target = game.bike.frame.pos;
+
         set_camera(&cam);
 
         game.draw();
-
-        // // draw canvas
-        // let ratio = screen_width() / screen_height();
-        // let rect = if ratio > W / H {
-        //     let w = H * ratio;
-        //     Rect::new((w - W) * -0.5, 0.0, w, H)
-        // } else {
-        //     let h = W / ratio;
-        //     Rect::new(0.0, (h - H) * -0.5, W, h)
-        // };
-        // let mut cam = Camera2D::from_display_rect(rect);
-        // cam.zoom.y *= -1.0;
-        // set_camera(&cam);
-        // draw_texture(canvas.texture, 0.0, 0.0, WHITE);
 
         next_frame().await
     }
