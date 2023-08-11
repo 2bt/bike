@@ -78,11 +78,19 @@
                          "y":196
                         }, 
                         {
-                         "x":31,
+                         "x":47,
                          "y":196
                         }, 
                         {
-                         "x":-77,
+                         "x":15.1708127937636,
+                         "y":200.690129542589
+                        }, 
+                        {
+                         "x":-57,
+                         "y":224
+                        }, 
+                        {
+                         "x":-81,
                          "y":228
                         }, 
                         {
@@ -111,7 +119,7 @@
                         }, 
                         {
                          "x":-257,
-                         "y":8
+                         "y":20
                         }, 
                         {
                          "x":-225,
@@ -313,7 +321,31 @@
                  "visible":true,
                  "width":0,
                  "x":-144,
-                 "y":260
+                 "y":268
+                }, 
+                {
+                 "height":0,
+                 "id":10,
+                 "name":"star",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":160,
+                 "y":224
+                }, 
+                {
+                 "height":0,
+                 "id":12,
+                 "name":"star",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":-80,
+                 "y":16
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -322,7 +354,7 @@
          "y":0
         }],
  "nextlayerid":4,
- "nextobjectid":10,
+ "nextobjectid":14,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.2",
