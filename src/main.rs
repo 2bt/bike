@@ -93,7 +93,7 @@ impl Game {
         match self.state {
             GameState::GameOver => {
                 // flash
-                let x = (self.time * 10.0).min(1.0);
+                let x = (self.time * 5.0).min(1.0);
                 clear_background(mix_color(
                     Color::new(1.0, 0.0, 0.0, 1.0),
                     Color::from_rgba(10, 12, 15, 255),
@@ -109,9 +109,9 @@ impl Game {
         self.bike.draw();
 
         // labels
-        let f = macroquad::text::camera_font_scale(10.0);
-        let x = self.level.start.x;
-        let mut y = self.level.start.y + 32.0;
+        let f = macroquad::text::camera_font_scale(8.0);
+        let x = self.level.start.x - 15.0;
+        let mut y = self.level.start.y + 58.0;
         let mut txt = |text| {
             draw_text_ex(
                 text,
@@ -123,7 +123,7 @@ impl Game {
                     ..TextParams::default()
                 },
             );
-            y += 16.0;
+            y += 8.0;
         };
         txt("[UP]    - accelerate");
         txt("[DOWN]  - break");

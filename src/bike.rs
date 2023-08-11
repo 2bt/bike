@@ -227,7 +227,7 @@ impl Bike {
 
         // pick up stars
         level.pickup_stars(head, 4.4);
-        level.pickup_stars(self.frame.pos, 12.0);
+        level.pickup_stars(self.frame.pos, 13.0);
         level.pickup_stars(self.wheels[0].pos, WHEEL_R);
         level.pickup_stars(self.wheels[1].pos, WHEEL_R);
     }
