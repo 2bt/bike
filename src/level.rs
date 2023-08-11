@@ -2,15 +2,67 @@ use macroquad::prelude::*;
 
 use crate::{fx, materials};
 
+const STAR_R: f32 = 10.0;
+
+
+pub struct CollisionInfo {
+    pub normal: Vec2,
+    pub dist: f32,
+}
+
 pub struct Wall {
     pub points: Vec<Vec2>,
+}
+
+pub struct Star {
+    pub alive: bool,
+    pub pos: Vec2,
 }
 
 pub struct Level {
     pub walls: Vec<Wall>,
     pub start: Vec2,
-    pub stars: Vec<Vec2>,
+    pub stars: Vec<Star>,
+    pub stars_left: usize,
     pub mesh: Mesh,
+}
+
+fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionInfo> {
+    let pq = q - p;
+    let pm = m - p;
+    let e = pq.dot(pm);
+    if e < 0.0 {
+        let dist = pm.length();
+        if dist < r {
+            return Some(CollisionInfo {
+                normal: pm.normalize(),
+                dist: r - dist,
+            });
+        }
+    } else if e < pq.length_squared() {
+        let mut norm = pq.perp().normalize();
+        let mut dist = norm.dot(pm);
+        if dist < 0.0 {
+            dist = -dist;
+            norm = -norm;
+        }
+        if dist < r {
+            return Some(CollisionInfo {
+                normal: norm,
+                dist: r - dist,
+            });
+        }
+    } else {
+        let qm = m - q;
+        let dist = qm.length();
+        if dist < r {
+            return Some(CollisionInfo {
+                normal: qm.normalize(),
+                dist: r - dist,
+            });
+        }
+    }
+    None
 }
 
 fn fix_points(points: &mut Vec<Vec2>) {
@@ -38,6 +90,7 @@ impl Level {
             walls: vec![],
             start: vec2(0.0, 0.0),
             stars: vec![],
+            stars_left: 0,
             mesh: Mesh {
                 vertices: vec![],
                 indices: vec![],
@@ -70,7 +123,8 @@ impl Level {
                                 level.start = pos;
                             }
                             "star" => {
-                                level.stars.push(pos);
+                                level.stars.push(Star { alive: true, pos });
+                                level.stars_left += 1;
                             }
                             _ => {}
                         }
@@ -98,13 +152,49 @@ impl Level {
         Ok(level)
     }
 
+    pub fn circle_collision(&self, pos: Vec2, r: f32) -> Option<CollisionInfo> {
+        let mut colli: Option<CollisionInfo> = None;
+        for wall in self.walls.iter() {
+            for (i, p) in wall.points.iter().enumerate() {
+                let q = wall.points[(i + 1) % wall.points.len()];
+                if let Some(ci) = circle_line_collision(pos, r, *p, q) {
+                    colli = Some(match colli {
+                        Some(cc) if cc.dist > ci.dist => cc,
+                        _ => ci,
+                    })
+                }
+            }
+        }
+        colli
+    }
+
+    pub fn pickup_stars(&mut self, pos: Vec2, r: f32) {
+        let l = r + STAR_R;
+        let l = l * l;
+        for star in self.stars.iter_mut() {
+            if !star.alive { continue; }
+            if (pos - star.pos).length_squared() <= l {
+                star.alive = false;
+                self.stars_left -= 1;
+            }
+        }
+    }
+    pub fn reset_stars(&mut self) {
+        for star in self.stars.iter_mut() {
+            star.alive = true;
+        }
+        self.stars_left = self.stars.len();
+    }
+
+
     pub fn draw(&self, materials: &materials::Materials) {
         gl_use_material(&materials.wall_material);
         draw_mesh(&self.mesh);
         gl_use_default_material();
 
         for star in self.stars.iter() {
-            draw_circle(star.x, star.y, 9.0, Color::from_hex(0xffff00));
+            if !star.alive { continue; }
+            draw_circle(star.pos.x, star.pos.y, 9.0, Color::from_hex(0xffff00));
         }
     }
 }

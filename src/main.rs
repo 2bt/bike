@@ -10,7 +10,7 @@ const H: f32 = 270.0;
 
 enum GameState {
     Playing,
-    GameOver,
+    Over,
 }
 
 struct Game {
@@ -20,6 +20,10 @@ struct Game {
     level: level::Level,
     bike: bike::Bike,
     materials: materials::Materials,
+}
+
+fn mix_color(a: Color, b: Color, x: f32) -> Color {
+    Color::from_vec(a.to_vec() * (1.0 - x) + b.to_vec() * x)
 }
 
 impl Game {
@@ -37,22 +41,32 @@ impl Game {
     }
 
     fn update(&mut self) {
+        // reset
+        if is_key_down(KeyCode::Enter) {
+            self.state = GameState::Playing;
+            self.time = 0.0;
+            self.physics_time = 0.0;
+            self.bike = bike::Bike::new(self.level.start);
+            self.level.reset_stars();
+        }
+
+        self.time += get_frame_time();
+
         match self.state {
             GameState::Playing => {
-                if is_key_down(KeyCode::Enter) {
-                    self.time = 0.0;
-                    self.physics_time = 0.0;
-                    self.bike = bike::Bike::new(self.level.start);
-                }
-
-                self.time += get_frame_time();
                 let dt = 0.0002;
                 while self.physics_time + dt < self.time {
                     self.physics_time += dt;
-                    self.bike.update(dt, &self.level);
+                    self.bike.update(dt, &mut self.level);
+
+                    if !self.bike.alive {
+                        self.state = GameState::Over;
+                        self.time = 0.0;
+                        break;
+                    }
                 }
             }
-            GameState::GameOver => {}
+            GameState::Over => {}
         }
     }
 
@@ -68,10 +82,22 @@ impl Game {
         let mut cam = Camera2D::from_display_rect(rect);
         cam.zoom.y = cam.zoom.y.abs();
         cam.target = self.bike.frame.pos;
-
         set_camera(&cam);
 
-        clear_background(Color::from_rgba(10, 12, 15, 255));
+        match self.state {
+            GameState::Playing => {
+                clear_background(Color::from_rgba(10, 12, 15, 255));
+            }
+            GameState::Over => {
+                // flash
+                let x = (self.time * 10.0).min(1.0);
+                clear_background(mix_color(
+                    Color::new(1.0, 1.0, 1.0, 1.0),
+                    Color::from_rgba(10, 12, 15, 255),
+                    x,
+                ));
+            }
+        }
 
         self.level.draw(&self.materials);
         self.bike.draw();
@@ -97,6 +123,21 @@ impl Game {
         txt("[DOWN]  - break");
         txt("[SPACE] - toggle direction");
         txt("[ENTER] - reset position");
+
+
+        cam.target.x = rect.w * 0.5;
+        cam.target.y = rect.h * 0.5;
+        set_camera(&cam);
+        draw_text_ex(
+            &format!("STARS: {}/{}", self.level.stars.len() - self.level.stars_left, self.level.stars.len()),
+            6.0,
+            10.0,
+            TextParams {
+                font_size: f.0,
+                font_scale: f.1,
+                ..TextParams::default()
+            },
+        );
     }
 }
 
