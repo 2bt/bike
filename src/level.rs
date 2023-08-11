@@ -1,6 +1,8 @@
 use macroquad::prelude::*;
+use std::f32::consts::PI;
 
-use crate::{fx, materials};
+use crate::fx;
+use crate::materials;
 
 const STAR_R: f32 = 10.0;
 
@@ -192,9 +194,17 @@ impl Level {
         draw_mesh(&self.mesh);
         gl_use_default_material();
 
+
+        let c = Color::new(0.9, 0.9, 0.2, 1.0);
         for star in self.stars.iter() {
             if !star.alive { continue; }
-            draw_circle(star.pos.x, star.pos.y, 9.0, Color::from_hex(0xffff00));
+            let mut points = [Vec2::ZERO; 12];
+            points[0] = star.pos;
+            for i in 1..points.len() {
+                let r = if i % 2 == 0 { STAR_R } else { STAR_R * 0.5 };
+                points[i] = star.pos + vec2(0.0, -r).rotate(Vec2::from_angle((i as f32) * 0.2 * PI));
+            }
+            fx::draw_polygon(&points, c);
         }
     }
 }

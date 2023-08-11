@@ -10,7 +10,8 @@ const H: f32 = 270.0;
 
 enum GameState {
     Playing,
-    Over,
+    LevelCompleted,
+    GameOver,
 }
 
 struct Game {
@@ -59,14 +60,19 @@ impl Game {
                     self.physics_time += dt;
                     self.bike.update(dt, &mut self.level);
 
+                    if self.level.stars_left == 0 {
+                        self.state = GameState::LevelCompleted;
+                        self.time = 0.0;
+                        break;
+                    }
                     if !self.bike.alive {
-                        self.state = GameState::Over;
+                        self.state = GameState::GameOver;
                         self.time = 0.0;
                         break;
                     }
                 }
             }
-            GameState::Over => {}
+            _ => {}
         }
     }
 
@@ -85,17 +91,17 @@ impl Game {
         set_camera(&cam);
 
         match self.state {
-            GameState::Playing => {
-                clear_background(Color::from_rgba(10, 12, 15, 255));
-            }
-            GameState::Over => {
+            GameState::GameOver => {
                 // flash
                 let x = (self.time * 10.0).min(1.0);
                 clear_background(mix_color(
-                    Color::new(1.0, 1.0, 1.0, 1.0),
+                    Color::new(1.0, 0.0, 0.0, 1.0),
                     Color::from_rgba(10, 12, 15, 255),
                     x,
                 ));
+            }
+            _ => {
+                clear_background(Color::from_rgba(10, 12, 15, 255));
             }
         }
 
@@ -103,7 +109,7 @@ impl Game {
         self.bike.draw();
 
         // labels
-        let f = macroquad::text::camera_font_scale(8.0);
+        let f = macroquad::text::camera_font_scale(10.0);
         let x = self.level.start.x;
         let mut y = self.level.start.y + 32.0;
         let mut txt = |text| {
@@ -117,19 +123,21 @@ impl Game {
                     ..TextParams::default()
                 },
             );
-            y += 8.0;
+            y += 16.0;
         };
         txt("[UP]    - accelerate");
         txt("[DOWN]  - break");
         txt("[SPACE] - toggle direction");
         txt("[ENTER] - reset position");
 
-
-        cam.target.x = rect.w * 0.5;
-        cam.target.y = rect.h * 0.5;
+        cam.target = rect.size() * 0.5;
         set_camera(&cam);
         draw_text_ex(
-            &format!("STARS: {}/{}", self.level.stars.len() - self.level.stars_left, self.level.stars.len()),
+            &format!(
+                "STARS: {}/{}",
+                self.level.stars.len() - self.level.stars_left,
+                self.level.stars.len()
+            ),
             6.0,
             10.0,
             TextParams {
@@ -138,6 +146,25 @@ impl Game {
                 ..TextParams::default()
             },
         );
+
+        if let GameState::LevelCompleted = self.state {
+            cam.target = Vec2::ZERO;
+            set_camera(&cam);
+            let msg = "WELL DONE!";
+            let f = macroquad::text::camera_font_scale(30.0);
+            let p = get_text_center(msg, None, f.0, f.1, 0.0);
+            draw_text_ex(
+                msg,
+                0.0 - p.x,
+                -50.0 - p.y,
+                TextParams {
+                    font_size: f.0,
+                    font_scale: f.1,
+                    ..TextParams::default()
+                },
+            );
+        }
+
     }
 }
 
