@@ -12,20 +12,21 @@ pub struct CollisionInfo {
 }
 
 pub struct Wall {
-    pub points: Vec<Vec2>,
+    points: Vec<Vec2>,
 }
 
 pub struct Star {
-    pub alive: bool,
-    pub pos: Vec2,
+    alive: bool,
+    pos: Vec2,
 }
 
 pub struct Level {
-    pub walls: Vec<Wall>,
     pub start: Vec2,
     pub stars: Vec<Star>,
     pub stars_left: usize,
-    pub mesh: Mesh,
+    walls: Vec<Wall>,
+    time: f32,
+    mesh: Mesh,
 }
 
 fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionInfo> {
@@ -92,6 +93,7 @@ impl Level {
             start: vec2(0.0, 0.0),
             stars: vec![],
             stars_left: 0,
+            time: 0.0,
             mesh: Mesh {
                 vertices: vec![],
                 indices: vec![],
@@ -183,10 +185,15 @@ impl Level {
         }
     }
     pub fn reset_stars(&mut self) {
+        self.time = 0.0;
         for star in self.stars.iter_mut() {
             star.alive = true;
         }
         self.stars_left = self.stars.len();
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.time += dt;
     }
 
     pub fn draw(&self, materials: &materials::Materials) {
@@ -194,7 +201,7 @@ impl Level {
         draw_mesh(&self.mesh);
         gl_use_default_material();
 
-        let c = Color::new(0.9, 0.9, 0.2, 1.0);
+        let c = Color::new(0.8, 0.8, 0.3, 1.0);
         for star in self.stars.iter() {
             if !star.alive {
                 continue;
@@ -203,8 +210,8 @@ impl Level {
             points[0] = star.pos;
             for i in 1..points.len() {
                 let r = if i % 2 == 0 { STAR_R } else { STAR_R * 0.5 };
-                points[i] =
-                    star.pos + vec2(0.0, -r).rotate(Vec2::from_angle((i as f32) * 0.2 * PI));
+                let ang = (i as f32) * 0.2 * PI + (self.time * 3.0).sin() * 0.8;
+                points[i] = star.pos + vec2(0.0, -r).rotate(Vec2::from_angle(ang));
             }
             fx::draw_polygon(&points, c);
         }

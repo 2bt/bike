@@ -51,10 +51,14 @@ impl Game {
             self.level.reset_stars();
         }
 
-        self.time += get_frame_time();
+        let dt = get_frame_time();
+        self.time += dt;
+
 
         match self.state {
             GameState::Playing => {
+                self.level.update(dt);
+
                 let dt = 0.0002;
                 while self.physics_time + dt < self.time {
                     self.physics_time += dt;

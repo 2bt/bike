@@ -17,7 +17,7 @@ const SUSPENSION_FRICTION: f32 = 40.0;
 // const BREAK: f32 = 60000.0 * 0.5;
 // const BREAK_FRICTION: f32 = 40000.0 * 0.5;
 const BREAK: f32 = 0.0;
-const BREAK_FRICTION: f32 = 3000.0;
+const BREAK_FRICTION: f32 = 7000.0;
 const MAX_SPEED: f32 = 50.0;
 const GAS: f32 = 17000.0;
 
@@ -53,9 +53,6 @@ fn update_frame(frame: &mut Body, dt: f32) {
 }
 
 fn update_wheel(wheel: &mut Body, dt: f32, level: &level::Level) {
-
-    // wheel.torque = clamp(wheel.torque, -100000.0, 100000.0);
-
     let mut b = false;
     if let Some(ci) = level.circle_collision(wheel.pos, WHEEL_R) {
         wheel.pos += ci.normal * ci.dist;
