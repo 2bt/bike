@@ -6,7 +6,6 @@ use crate::materials;
 
 const STAR_R: f32 = 10.0;
 
-
 pub struct CollisionInfo {
     pub normal: Vec2,
     pub dist: f32,
@@ -174,7 +173,9 @@ impl Level {
         let l = r + STAR_R;
         let l = l * l;
         for star in self.stars.iter_mut() {
-            if !star.alive { continue; }
+            if !star.alive {
+                continue;
+            }
             if (pos - star.pos).length_squared() <= l {
                 star.alive = false;
                 self.stars_left -= 1;
@@ -188,21 +189,22 @@ impl Level {
         self.stars_left = self.stars.len();
     }
 
-
     pub fn draw(&self, materials: &materials::Materials) {
         gl_use_material(&materials.wall_material);
         draw_mesh(&self.mesh);
         gl_use_default_material();
 
-
         let c = Color::new(0.9, 0.9, 0.2, 1.0);
         for star in self.stars.iter() {
-            if !star.alive { continue; }
+            if !star.alive {
+                continue;
+            }
             let mut points = [Vec2::ZERO; 12];
             points[0] = star.pos;
             for i in 1..points.len() {
                 let r = if i % 2 == 0 { STAR_R } else { STAR_R * 0.5 };
-                points[i] = star.pos + vec2(0.0, -r).rotate(Vec2::from_angle((i as f32) * 0.2 * PI));
+                points[i] =
+                    star.pos + vec2(0.0, -r).rotate(Vec2::from_angle((i as f32) * 0.2 * PI));
             }
             fx::draw_polygon(&points, c);
         }

@@ -14,10 +14,10 @@ const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
 const SUSPENSION: f32 = 700.0;
 const SUSPENSION_FRICTION: f32 = 40.0;
-// const BREAK: f32 = 60000.0;
-// const BREAK_FRICTION: f32 = 40000.0;
-const BREAK: f32 = 60000.0 * 0.5;
-const BREAK_FRICTION: f32 = 40000.0 * 0.5;
+// const BREAK: f32 = 60000.0 * 0.5;
+// const BREAK_FRICTION: f32 = 40000.0 * 0.5;
+const BREAK: f32 = 0.0;
+const BREAK_FRICTION: f32 = 3000.0;
 const MAX_SPEED: f32 = 50.0;
 const GAS: f32 = 17000.0;
 
@@ -47,24 +47,39 @@ fn update_frame(frame: &mut Body, dt: f32) {
     frame.vel += frame.force / FRAME_MASS * dt;
     frame.ang += frame.ang_vel * dt;
     frame.pos += frame.vel * dt;
+    // reset forces
+    frame.torque = 0.0;
+    frame.force = vec2(0.0, GRAVITY * FRAME_MASS);
 }
 
-fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<level::CollisionInfo>) {
-    if let Some(ci) = ci {
+fn update_wheel(wheel: &mut Body, dt: f32, level: &level::Level) {
+
+    // wheel.torque = clamp(wheel.torque, -100000.0, 100000.0);
+
+    let mut b = false;
+    if let Some(ci) = level.circle_collision(wheel.pos, WHEEL_R) {
         wheel.pos += ci.normal * ci.dist;
 
-        wheel.ang_vel = ci.normal.perp_dot(wheel.vel) / WHEEL_R;
-        wheel.torque += ci.normal.perp_dot(wheel.force) * WHEEL_R;
+        if ci.normal.dot(wheel.vel) < 0.0 {
+            wheel.ang_vel = ci.normal.perp_dot(wheel.vel) / WHEEL_R;
+            wheel.torque += ci.normal.perp_dot(wheel.force) * WHEEL_R;
 
-        wheel.ang_vel += wheel.torque / WHEEL_INERTIA * dt;
-        wheel.vel = ci.normal.perp() * wheel.ang_vel * WHEEL_R;
-    } else {
+            wheel.ang_vel += wheel.torque / WHEEL_INERTIA * dt;
+            wheel.vel = ci.normal.perp() * wheel.ang_vel * WHEEL_R;
+            b = true;
+        }
+    }
+    if !b {
         wheel.ang_vel += wheel.torque / WHEEL_INERTIA * dt;
         wheel.vel += wheel.force / WHEEL_MASS * dt;
     }
-    wheel.ang += wheel.ang_vel * dt;
 
+    wheel.ang += wheel.ang_vel * dt;
     wheel.pos += wheel.vel * dt;
+
+    // reset forces
+    wheel.torque = 0.0;
+    wheel.force = vec2(0.0, GRAVITY * WHEEL_MASS);
 }
 
 pub enum Direction {
@@ -124,14 +139,6 @@ impl Bike {
             Direction::Left => (-1.0_f32).max(self.dir_lerp - dt * 20.0),
         };
 
-        // reset forces
-        self.frame.torque = 0.0;
-        self.frame.force = vec2(0.0, GRAVITY * FRAME_MASS);
-        self.wheels[0].torque = 0.0;
-        self.wheels[0].force = vec2(0.0, GRAVITY * WHEEL_MASS);
-        self.wheels[1].torque = 0.0;
-        self.wheels[1].force = vec2(0.0, GRAVITY * WHEEL_MASS);
-
         // move around
         if is_key_down(KeyCode::D) {
             self.frame.force.x += 5000.0;
@@ -155,11 +162,13 @@ impl Bike {
         }
         if breaking {
             for (i, wheel) in self.wheels.iter_mut().enumerate() {
+
                 let da = wheel.ang - self.frame.ang - self.break_angles[i];
                 let dv = wheel.ang_vel - self.frame.ang_vel;
                 let torque = da * BREAK + dv * BREAK_FRICTION;
                 wheel.torque -= torque;
                 self.frame.torque += torque;
+
             }
         } else {
             // wrap angles
@@ -192,7 +201,7 @@ impl Bike {
             let arm = arm.rotate(rot);
             let force = (self.frame.pos + arm - wheel.pos) * SUSPENSION;
 
-            let force = force * 1.0001_f32.powf(force.length());
+            // let force = force * 1.0001_f32.powf(force.length());
 
             wheel.force += force;
             self.frame.force -= force;
@@ -205,7 +214,7 @@ impl Bike {
             let dv = self.frame.vel + self.frame.ang_vel * arm.perp() - wheel.vel;
             let force = dv * SUSPENSION_FRICTION;
 
-            let force = force * 1.0001_f32.powf(force.length());
+            // let force = force * 1.0001_f32.powf(force.length());
 
             wheel.force += force;
             self.frame.force -= force;
@@ -214,8 +223,7 @@ impl Bike {
 
         update_frame(&mut self.frame, dt);
         for w in self.wheels.iter_mut() {
-            let ci = level.circle_collision(w.pos, WHEEL_R);
-            update_wheel(w, dt, ci);
+            update_wheel(w, dt, &level);
         }
 
         // head collision
