@@ -2,10 +2,15 @@ use macroquad::prelude::*;
 
 pub struct Materials {
     pub wall_material: Material,
+    pub font: Font,
 }
 
 impl Materials {
     pub fn load() -> Materials {
+
+        let mut font = load_ttf_font_from_bytes(include_bytes!("../assets/Copilme.ttf")).unwrap();
+        font.set_filter(FilterMode::Linear);
+
         Materials {
             wall_material: load_material(
                 ShaderSource {
@@ -41,6 +46,7 @@ void main() {
                 Default::default(),
             )
             .unwrap(),
+            font,
         }
     }
 }

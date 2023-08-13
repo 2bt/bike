@@ -54,7 +54,6 @@ impl Game {
         let dt = get_frame_time();
         self.time += dt;
 
-
         match self.state {
             GameState::Playing => {
                 self.level.update(dt);
@@ -113,26 +112,27 @@ impl Game {
         self.bike.draw();
 
         // labels
-        let f = macroquad::text::camera_font_scale(8.0);
-        let x = self.level.start.x - 15.0;
-        let mut y = self.level.start.y + 58.0;
-        let mut txt = |text| {
-            draw_text_ex(
-                text,
-                x,
-                y,
-                TextParams {
-                    font_size: f.0,
-                    font_scale: f.1,
-                    ..TextParams::default()
-                },
-            );
-            y += 8.0;
+        let font_scale = macroquad::text::camera_font_scale(10.0);
+        let text_params = TextParams {
+            font: Some(&self.materials.font),
+            font_size: font_scale.0,
+            font_scale: font_scale.1,
+            ..TextParams::default()
         };
-        txt("[UP]    - accelerate");
-        txt("[DOWN]  - break");
-        txt("[SPACE] - toggle direction");
-        txt("[ENTER] - reset position");
+
+        {
+            let x = self.level.start.x - 16.0;
+            let mut y = self.level.start.y + 64.0;
+            let mut txt = |left, right| {
+                draw_text_ex(left, x, y, text_params.clone());
+                draw_text_ex(right, x + 64.0, y, text_params.clone());
+                y += 16.0;
+            };
+            txt("[UP]   ", "accelerate");
+            txt("[DOWN] ", "break");
+            txt("[SPACE]", "toggle direction");
+            txt("[ENTER]", "reset position");
+        }
 
         cam.target = rect.size() * 0.5;
         set_camera(&cam);
@@ -144,31 +144,47 @@ impl Game {
             ),
             6.0,
             10.0,
-            TextParams {
-                font_size: f.0,
-                font_scale: f.1,
-                ..TextParams::default()
-            },
+            text_params.clone(),
         );
+
+        // show time
+        cam.target = vec2(-rect.w, rect.h) * 0.5;
+        set_camera(&cam);
+        let t = (self.physics_time * 100.0) as u32;
+        let str = format!(
+            "{:0>2}:{:0>2}:{:0>2}",
+            t / (100 * 60),
+            t / 100 % 60,
+            t % 100,
+        );
+        let mut x = -40.0;
+        // make it a bit more monospacy
+        for c in str.chars() {
+            let o = match c {
+                ':' => 1.0,
+                '1' => 1.5,
+                _ => 0.0,
+            };
+            draw_text_ex(&c.to_string(), x + o, 10.0, text_params.clone());
+            x += match c {
+                ':' => 3.0,
+                _ => 5.0,
+            };
+        }
 
         if let GameState::LevelCompleted = self.state {
             cam.target = Vec2::ZERO;
             set_camera(&cam);
             let msg = "WELL DONE!";
-            let f = macroquad::text::camera_font_scale(30.0);
-            let p = get_text_center(msg, None, f.0, f.1, 0.0);
-            draw_text_ex(
-                msg,
-                0.0 - p.x,
-                -50.0 - p.y,
-                TextParams {
-                    font_size: f.0,
-                    font_scale: f.1,
-                    ..TextParams::default()
-                },
-            );
+            let fs = macroquad::text::camera_font_scale(30.0);
+            let tp = TextParams {
+                font: Some(&self.materials.font),
+                font_size: fs.0,
+                font_scale: fs.1,
+                ..TextParams::default()
+            };
+            draw_text_ex(msg, -75.0, -50.0, tp);
         }
-
     }
 }
 

@@ -12,14 +12,14 @@ const WHEEL_INERTIA: f32 = 50.0;
 const WHEEL_R: f32 = 8.0;
 const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
-const SUSPENSION: f32 = 700.0;
+const SUSPENSION: f32 = 900.0;
 const SUSPENSION_FRICTION: f32 = 40.0;
 // const BREAK: f32 = 60000.0 * 0.5;
 // const BREAK_FRICTION: f32 = 40000.0 * 0.5;
-const BREAK: f32 = 0.0;
+const BREAK: f32 = 0.0; // disable this for now, it feels weird
 const BREAK_FRICTION: f32 = 7000.0;
 const MAX_SPEED: f32 = 50.0;
-const GAS: f32 = 17000.0;
+const GAS: f32 = 18000.0;
 
 pub struct Body {
     pub pos: Vec2,

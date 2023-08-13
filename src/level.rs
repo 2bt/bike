@@ -211,7 +211,7 @@ impl Level {
             for i in 1..points.len() {
                 let r = if i % 2 == 0 { STAR_R } else { STAR_R * 0.5 };
                 let ang = (i as f32) * 0.2 * PI + (self.time * 3.0).sin() * 0.8;
-                points[i] = star.pos + vec2(0.0, -r).rotate(Vec2::from_angle(ang));
+                points[i] = star.pos - Vec2::from_angle(ang) * r;
             }
             fx::draw_polygon(&points, c);
         }
