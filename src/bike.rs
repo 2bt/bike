@@ -352,8 +352,30 @@ impl Bike {
         limb(-10, -9, -2, -3, 7.0, 4.0, c);
         limb(-2, -3, -1, 6, 4.0, 3.0, c);
         limb(-1, 6, 2, 6, 3.0, 2.0, c);
+
         // arm
-        limb(-1, -15, 2, -8, 4.0, 3.0, c);
-        limb(2, -8, 10, -7, 3.0, 2.5, c);
+        // TODO: clean up this mess
+        // limb(-1, -15, 2, -8, 4.0, 3.0, c);
+        // limb(2, -8, 10, -7, 3.0, 2.5, c);
+        let ang = match &self.jump {
+            Some(jump) => {
+                let t = jump.time;
+                let x = 0.0_f32.max(0.1_f32.powf(t) * 3.0 - 1.0) * (t * 10.0).min(1.0);
+                match jump.dir {
+                    Direction::Left => x,
+                    Direction::Right => -x,
+                }
+            }
+            None => 0.0,
+        };
+        let trans =
+            trans * Affine2::from_scale_angle_translation(Vec2::ONE, ang, vec2(-1.0, -15.0));
+        let t = |x: i32, y: i32| trans.transform_point2(vec2(x as f32, y as f32));
+        let limb = |x1: i32, y1: i32, x2: i32, y2: i32, w: f32, v: f32, c: Color| {
+            fx::draw_limb(t(x1, y1), t(x2, y2), w, v, c);
+        };
+
+        limb(0, 0, 3, 7, 4.0, 3.0, c);
+        limb(3, 7, 11, 8, 3.0, 2.5, c);
     }
 }
