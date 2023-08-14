@@ -58,10 +58,24 @@ impl Game {
             GameState::Playing => {
                 self.level.update(dt);
 
+                let input = bike::Input {
+                    toggle_dir: is_key_down(KeyCode::Space),
+                    wheel: match (is_key_down(KeyCode::Down), is_key_down(KeyCode::Up)) {
+                        (true, false) => bike::WheelInput::Break,
+                        (false, true) => bike::WheelInput::Accelerate,
+                        _ => bike::WheelInput::None,
+                    },
+                    jump: match (is_key_down(KeyCode::Left), is_key_down(KeyCode::Right)) {
+                        (true, false) => Some(bike::Direction::Left),
+                        (false, true) => Some(bike::Direction::Right),
+                        _ => None,
+                    },
+                };
+
                 let dt = 0.0002;
                 while self.physics_time + dt < self.time {
                     self.physics_time += dt;
-                    self.bike.update(dt, &mut self.level);
+                    self.bike.update(dt, &mut self.level, &input);
 
                     if self.level.stars_left == 0 {
                         self.state = GameState::LevelCompleted;
@@ -112,7 +126,7 @@ impl Game {
         self.bike.draw();
 
         // labels
-        let font_scale = macroquad::text::camera_font_scale(10.0);
+        let font_scale = macroquad::text::camera_font_scale(11.0);
         let text_params = TextParams {
             font: Some(&self.materials.font),
             font_size: font_scale.0,
@@ -121,15 +135,19 @@ impl Game {
         };
 
         {
+            let text_params = TextParams {
+                color: Color::new(1.0, 1.0, 1.0, 0.7),
+                ..text_params
+            };
             let x = self.level.start.x - 16.0;
             let mut y = self.level.start.y + 64.0;
             let mut txt = |left, right| {
                 draw_text_ex(left, x, y, text_params.clone());
-                draw_text_ex(right, x + 64.0, y, text_params.clone());
+                draw_text_ex(right, x + 80.0, y, text_params.clone());
                 y += 16.0;
             };
-            txt("[UP]   ", "accelerate");
-            txt("[DOWN] ", "break");
+            txt("[UP]/[DOWN]", "accelerate/break");
+            txt("[LEFT]/[RIGHT]", "jump");
             txt("[SPACE]", "toggle direction");
             txt("[ENTER]", "reset position");
         }
@@ -142,8 +160,8 @@ impl Game {
                 self.level.stars.len() - self.level.stars_left,
                 self.level.stars.len()
             ),
-            6.0,
-            10.0,
+            5.0,
+            12.0,
             text_params.clone(),
         );
 
@@ -157,7 +175,7 @@ impl Game {
             t / 100 % 60,
             t % 100,
         );
-        let mut x = -40.0;
+        let mut x = -42.0;
         // make it a bit more monospacy
         for c in str.chars() {
             let o = match c {
@@ -165,7 +183,7 @@ impl Game {
                 '1' => 1.5,
                 _ => 0.0,
             };
-            draw_text_ex(&c.to_string(), x + o, 10.0, text_params.clone());
+            draw_text_ex(&c.to_string(), x + o, 12.0, text_params.clone());
             x += match c {
                 ':' => 3.0,
                 _ => 5.0,

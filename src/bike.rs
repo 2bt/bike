@@ -12,14 +12,36 @@ const WHEEL_INERTIA: f32 = 50.0;
 const WHEEL_R: f32 = 8.0;
 const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
-const SUSPENSION: f32 = 900.0;
-const SUSPENSION_FRICTION: f32 = 40.0;
+const SUSPENSION: f32 = 1200.0;
+const SUSPENSION_FRICTION: f32 = 70.0;
 // const BREAK: f32 = 60000.0 * 0.5;
 // const BREAK_FRICTION: f32 = 40000.0 * 0.5;
 const BREAK: f32 = 0.0; // disable this for now, it feels weird
 const BREAK_FRICTION: f32 = 7000.0;
 const MAX_SPEED: f32 = 50.0;
 const GAS: f32 = 18000.0;
+
+const JUMP_STRENGTH: f32 = 8.0;
+const JUMP_DURATION: f32 = 0.1;
+const JUMP_PAUSE: f32 = 0.5;
+
+#[derive(Clone, Copy)]
+pub enum Direction {
+    Right,
+    Left,
+}
+
+#[derive(PartialEq)]
+pub enum WheelInput {
+    None,
+    Break,
+    Accelerate,
+}
+pub struct Input {
+    pub toggle_dir: bool,
+    pub wheel: WheelInput,
+    pub jump: Option<Direction>,
+}
 
 pub struct Body {
     pub pos: Vec2,
@@ -79,9 +101,10 @@ fn update_wheel(wheel: &mut Body, dt: f32, level: &level::Level) {
     wheel.force = vec2(0.0, GRAVITY * WHEEL_MASS);
 }
 
-pub enum Direction {
-    Right,
-    Left,
+pub struct Jump {
+    dir: Direction,
+    time: f32,
+    ang_vel: f32,
 }
 
 pub struct Bike {
@@ -92,7 +115,8 @@ pub struct Bike {
     break_angles: [f32; 2],
     dir: Direction,
     dir_lerp: f32,
-    dir_toggling: bool,
+    prev_toggle_dir: bool,
+    jump: Option<Jump>,
 }
 
 impl Bike {
@@ -117,41 +141,41 @@ impl Bike {
             break_angles: [0.0; 2],
             dir: Direction::Right,
             dir_lerp: 1.0,
-            dir_toggling: false,
+            prev_toggle_dir: false,
+            jump: None,
         }
     }
 
-    pub fn update(&mut self, dt: f32, level: &mut level::Level) {
+    pub fn update(&mut self, dt: f32, level: &mut level::Level, input: &Input) {
         // toggle dir
-        let dir_toggling = is_key_down(KeyCode::Space);
-        if dir_toggling && !self.dir_toggling {
+        if input.toggle_dir && !self.prev_toggle_dir {
             self.dir = match self.dir {
                 Direction::Right => Direction::Left,
                 Direction::Left => Direction::Right,
             };
         }
-        self.dir_toggling = dir_toggling;
+        self.prev_toggle_dir = input.toggle_dir;
         self.dir_lerp = match self.dir {
             Direction::Right => (1.0_f32).min(self.dir_lerp + dt * 20.0),
             Direction::Left => (-1.0_f32).max(self.dir_lerp - dt * 20.0),
         };
 
-        // move around
-        if is_key_down(KeyCode::D) {
-            self.frame.force.x += 5000.0;
-        }
-        if is_key_down(KeyCode::A) {
-            self.frame.force.x -= 5000.0;
-        }
-        if is_key_down(KeyCode::S) {
-            self.frame.force.y += 5000.0;
-        }
-        if is_key_down(KeyCode::W) {
-            self.frame.force.y -= 5000.0;
-        }
+        // // move around
+        // if is_key_down(KeyCode::D) {
+        //     self.frame.force.x += 5000.0;
+        // }
+        // if is_key_down(KeyCode::A) {
+        //     self.frame.force.x -= 5000.0;
+        // }
+        // if is_key_down(KeyCode::S) {
+        //     self.frame.force.y += 5000.0;
+        // }
+        // if is_key_down(KeyCode::W) {
+        //     self.frame.force.y -= 5000.0;
+        // }
 
         // break
-        let breaking = is_key_down(KeyCode::Down);
+        let breaking = input.wheel == WheelInput::Break;
         if breaking && !self.breaking {
             for (i, wheel) in self.wheels.iter().enumerate() {
                 self.break_angles[i] = wheel.ang - self.frame.ang;
@@ -159,13 +183,11 @@ impl Bike {
         }
         if breaking {
             for (i, wheel) in self.wheels.iter_mut().enumerate() {
-
                 let da = wheel.ang - self.frame.ang - self.break_angles[i];
                 let dv = wheel.ang_vel - self.frame.ang_vel;
                 let torque = da * BREAK + dv * BREAK_FRICTION;
                 wheel.torque -= torque;
                 self.frame.torque += torque;
-
             }
         } else {
             // wrap angles
@@ -180,9 +202,10 @@ impl Bike {
             Direction::Right => (&mut self.wheels[0], 1.0),
             Direction::Left => (&mut self.wheels[1], -1.0),
         };
-        if is_key_down(KeyCode::Up) && wheel.ang_vel < MAX_SPEED {
-            wheel.torque += GAS * sign;
-            self.frame.torque -= GAS * sign;
+        if input.wheel == WheelInput::Accelerate && wheel.ang_vel * sign < MAX_SPEED {
+            let torque = GAS * sign;
+            wheel.torque += torque;
+            self.frame.torque -= torque;
             // XXX: is this correct?
             // let arm = wheel.pos - frame.pos;
             // frame.force += torque * arm.perp() / arm.length_squared();
@@ -216,6 +239,46 @@ impl Bike {
             wheel.force += force;
             self.frame.force -= force;
             self.frame.torque += force.perp_dot(arm);
+        }
+
+        // jump
+        if let (Some(dir), None) = (input.jump, &self.jump) {
+            self.jump = Some(Jump {
+                dir: dir,
+                time: 0.0,
+                ang_vel: match dir {
+                    Direction::Left => {
+                        let res = self.frame.ang_vel.min(0.0);
+                        self.frame.ang_vel -= JUMP_STRENGTH;
+                        res
+                    }
+                    Direction::Right => {
+                        let res = self.frame.ang_vel.max(0.0);
+                        self.frame.ang_vel += JUMP_STRENGTH;
+                        res
+                    }
+                },
+            });
+        }
+
+        if let Some(jump) = &mut self.jump {
+            let t = jump.time;
+            jump.time += dt;
+            if t <= JUMP_DURATION && jump.time > JUMP_DURATION {
+                match jump.dir {
+                    Direction::Left => {
+                        self.frame.ang_vel += JUMP_STRENGTH;
+                        self.frame.ang_vel = self.frame.ang_vel.min(jump.ang_vel);
+                    }
+                    Direction::Right => {
+                        self.frame.ang_vel -= JUMP_STRENGTH;
+                        self.frame.ang_vel = self.frame.ang_vel.max(jump.ang_vel);
+                    }
+                };
+            }
+            if jump.time > JUMP_DURATION + JUMP_PAUSE {
+                self.jump = None
+            }
         }
 
         update_frame(&mut self.frame, dt);
