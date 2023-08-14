@@ -25,7 +25,7 @@ const JUMP_STRENGTH: f32 = 8.0;
 const JUMP_DURATION: f32 = 0.1;
 const JUMP_PAUSE: f32 = 0.5;
 
-#[derive(Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum Direction {
     Right,
     Left,
@@ -361,9 +361,10 @@ impl Bike {
             Some(jump) => {
                 let t = jump.time;
                 let x = 0.0_f32.max(0.1_f32.powf(t) * 3.0 - 1.0) * (t * 10.0).min(1.0);
-                match jump.dir {
-                    Direction::Left => x,
-                    Direction::Right => -x,
+                if jump.dir == self.dir {
+                    -x
+                } else {
+                    x
                 }
             }
             None => 0.0,
