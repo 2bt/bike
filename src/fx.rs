@@ -148,23 +148,12 @@ pub fn draw_limb(p: Vec2, q: Vec2, w: f32, v: f32, c: Color) {
     });
 }
 
-use std::cmp::Ordering;
-
-fn orientation(p: Vec2, q: Vec2, r: Vec2) -> Ordering {
+fn orientation(p: Vec2, q: Vec2, r: Vec2) -> bool {
     let val = (q - p).perp_dot(r - q);
-    if val == 0.0 {
-        Ordering::Equal
-    } else if val > 0.0 {
-        Ordering::Greater
-    } else {
-        Ordering::Less
-    }
+    return val <= 0.0;
 }
 fn is_inside_triangle(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
-    let o1 = orientation(p, a, b);
-    let o2 = orientation(p, b, c);
-    let o3 = orientation(p, c, a);
-    o1 == o2 && o2 == o3
+    orientation(p, a, b) && orientation(p, b, c) && orientation(p, c, a)
 }
 fn is_ear(polygon: &[Vec2], todo: &[usize], i: usize) -> bool {
     let n = todo.len();
@@ -177,10 +166,9 @@ fn is_ear(polygon: &[Vec2], todo: &[usize], i: usize) -> bool {
     let prev_p = polygon[prev_i];
     let next_p = polygon[next_i];
 
-    if orientation(prev_p, ear_p, next_p) != Ordering::Less {
+    if !orientation(prev_p, ear_p, next_p) {
         return false;
     }
-
     for j in todo.iter() {
         let j = *j;
         if (j == prev_i) || (j == ear_i) || (j == next_i) {
@@ -191,7 +179,6 @@ fn is_ear(polygon: &[Vec2], todo: &[usize], i: usize) -> bool {
             return false;
         }
     }
-
     true
 }
 

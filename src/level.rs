@@ -29,6 +29,23 @@ pub struct Level {
     mesh: Mesh,
 }
 
+impl Default for Level {
+    fn default() -> Self {
+        Level {
+            walls: vec![],
+            start: vec2(0.0, 0.0),
+            stars: vec![],
+            stars_left: 0,
+            time: 0.0,
+            mesh: Mesh {
+                vertices: vec![],
+                indices: vec![],
+                texture: None,
+            },
+        }
+    }
+}
+
 fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionInfo> {
     let pq = q - p;
     let pm = m - p;
@@ -88,19 +105,7 @@ fn vec_from_json(json: &serde_json::Value) -> Vec2 {
 
 impl Level {
     pub async fn load(path: &str) -> Result<Level, std::io::Error> {
-        let mut level = Level {
-            walls: vec![],
-            start: vec2(0.0, 0.0),
-            stars: vec![],
-            stars_left: 0,
-            time: 0.0,
-            mesh: Mesh {
-                vertices: vec![],
-                indices: vec![],
-                texture: None,
-            },
-        };
-
+        let mut level = Level::default();
         let string = macroquad::file::load_string(path).await.unwrap();
         let json: serde_json::Value = serde_json::from_str(&string)?;
 
@@ -183,13 +188,6 @@ impl Level {
                 self.stars_left -= 1;
             }
         }
-    }
-    pub fn reset_stars(&mut self) {
-        self.time = 0.0;
-        for star in self.stars.iter_mut() {
-            star.alive = true;
-        }
-        self.stars_left = self.stars.len();
     }
 
     pub fn update(&mut self, dt: f32) {

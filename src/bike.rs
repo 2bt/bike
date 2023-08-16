@@ -25,8 +25,9 @@ const JUMP_STRENGTH: f32 = 8.0;
 const JUMP_DURATION: f32 = 0.1;
 const JUMP_PAUSE: f32 = 0.5;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Default)]
 pub enum Direction {
+    #[default]
     Right,
     Left,
 }
@@ -106,7 +107,7 @@ pub struct Jump {
     time: f32,
     ang_vel: f32,
 }
-
+#[derive(Default)]
 pub struct Bike {
     pub alive: bool,
     pub frame: Body,
@@ -118,9 +119,9 @@ pub struct Bike {
     prev_toggle_dir: bool,
     jump: Option<Jump>,
 }
-
 impl Bike {
     pub fn new(pos: Vec2) -> Bike {
+        let pos = pos + vec2(0.0, -20.0);
         Bike {
             alive: true,
             frame: Body {
