@@ -44,6 +44,7 @@ pub struct Input {
     pub jump: Option<Direction>,
 }
 
+#[derive(Default)]
 pub struct Body {
     pub pos: Vec2,
     ang: f32,
@@ -52,17 +53,24 @@ pub struct Body {
     force: Vec2,
     torque: f32,
 }
-impl Default for Body {
-    fn default() -> Self {
-        return Body {
-            pos: vec2(0.0, 0.0),
-            ang: 0.0,
-            vel: vec2(0.0, 0.0),
-            ang_vel: 0.0,
-            force: vec2(0.0, 0.0),
-            torque: 0.0,
-        };
-    }
+
+pub struct Jump {
+    dir: Direction,
+    time: f32,
+    ang_vel: f32,
+}
+
+#[derive(Default)]
+pub struct Bike {
+    pub alive: bool,
+    pub frame: Body,
+    wheels: [Body; 2],
+    breaking: bool,
+    break_angles: [f32; 2],
+    dir: Direction,
+    dir_lerp: f32,
+    prev_toggle_dir: bool,
+    jump: Option<Jump>,
 }
 
 fn update_frame(frame: &mut Body, dt: f32) {
@@ -102,23 +110,6 @@ fn update_wheel(wheel: &mut Body, dt: f32, level: &level::Level) {
     wheel.force = vec2(0.0, GRAVITY * WHEEL_MASS);
 }
 
-pub struct Jump {
-    dir: Direction,
-    time: f32,
-    ang_vel: f32,
-}
-#[derive(Default)]
-pub struct Bike {
-    pub alive: bool,
-    pub frame: Body,
-    wheels: [Body; 2],
-    breaking: bool,
-    break_angles: [f32; 2],
-    dir: Direction,
-    dir_lerp: f32,
-    prev_toggle_dir: bool,
-    jump: Option<Jump>,
-}
 impl Bike {
     pub fn new(pos: Vec2) -> Bike {
         let pos = pos + vec2(0.0, -20.0);
@@ -161,20 +152,7 @@ impl Bike {
             Direction::Left => (-1.0_f32).max(self.dir_lerp - dt * 20.0),
         };
 
-        // // move around
-        // if is_key_down(KeyCode::D) {
-        //     self.frame.force.x += 5000.0;
-        // }
-        // if is_key_down(KeyCode::A) {
-        //     self.frame.force.x -= 5000.0;
-        // }
-        // if is_key_down(KeyCode::S) {
-        //     self.frame.force.y += 5000.0;
-        // }
-        // if is_key_down(KeyCode::W) {
-        //     self.frame.force.y -= 5000.0;
-        // }
-
+        // apply forces
         // break
         let breaking = input.wheel == WheelInput::Break;
         if breaking && !self.breaking {
@@ -242,7 +220,7 @@ impl Bike {
             self.frame.torque += force.perp_dot(arm);
         }
 
-        // jump
+        // start jump
         if let (Some(dir), None) = (input.jump, &self.jump) {
             self.jump = Some(Jump {
                 dir: dir,
@@ -261,7 +239,7 @@ impl Bike {
                 },
             });
         }
-
+        // jump
         if let Some(jump) = &mut self.jump {
             let t = jump.time;
             jump.time += dt;
@@ -283,9 +261,8 @@ impl Bike {
         }
 
         update_frame(&mut self.frame, dt);
-        for w in self.wheels.iter_mut() {
-            update_wheel(w, dt, &level);
-        }
+        update_wheel(&mut self.wheels[0], dt, &level);
+        update_wheel(&mut self.wheels[1], dt, &level);
 
         // head collision
         let rot = Vec2::from_angle(self.frame.ang);
