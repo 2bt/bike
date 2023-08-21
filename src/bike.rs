@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 
 use crate::fx;
 use crate::level;
+use crate::level::CollisionInfo;
 
 const GRAVITY: f32 = 100.0;
 const FRAME_MASS: f32 = 20.0;
@@ -83,9 +84,9 @@ fn update_frame(frame: &mut Body, dt: f32) {
     frame.force = vec2(0.0, GRAVITY * FRAME_MASS);
 }
 
-fn update_wheel(wheel: &mut Body, dt: f32, level: &level::Level) {
+fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<CollisionInfo>) {
     let mut b = false;
-    if let Some(ci) = level.circle_collision(wheel.pos, WHEEL_R) {
+    if let Some(ci) = ci {
         wheel.pos += ci.normal * ci.dist;
 
         if ci.normal.dot(wheel.vel) < 0.0 {
@@ -261,8 +262,17 @@ impl Bike {
         }
 
         update_frame(&mut self.frame, dt);
-        update_wheel(&mut self.wheels[0], dt, &level);
-        update_wheel(&mut self.wheels[1], dt, &level);
+        for wheel in self.wheels.iter_mut() {
+            let ci = level.circle_collision(wheel.pos, WHEEL_R);
+            if let Some(CollisionInfo {
+                tpe: level::PolygonType::Lava,
+                ..
+            }) = ci
+            {
+                self.alive = false;
+            }
+            update_wheel(wheel, dt, ci);
+        }
 
         // head collision
         let rot = Vec2::from_angle(self.frame.ang);
