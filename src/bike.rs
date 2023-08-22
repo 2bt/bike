@@ -15,9 +15,6 @@ const WHEEL_X: f32 = 17.0;
 const WHEEL_Y: f32 = 12.0;
 const SUSPENSION: f32 = 1200.0;
 const SUSPENSION_FRICTION: f32 = 70.0;
-// const BREAK: f32 = 60000.0 * 0.5;
-// const BREAK_FRICTION: f32 = 40000.0 * 0.5;
-const BREAK: f32 = 0.0; // disable this for now, it feels weird
 const BREAK_FRICTION: f32 = 7000.0;
 const MAX_SPEED: f32 = 50.0;
 const GAS: f32 = 18000.0;
@@ -66,8 +63,6 @@ pub struct Bike {
     pub alive: bool,
     pub frame: Body,
     wheels: [Body; 2],
-    breaking: bool,
-    break_angles: [f32; 2],
     dir: Direction,
     dir_lerp: f32,
     prev_toggle_dir: bool,
@@ -78,6 +73,7 @@ fn update_frame(frame: &mut Body, dt: f32) {
     frame.ang_vel += frame.torque / FRAME_INERTIA * dt;
     frame.vel += frame.force / FRAME_MASS * dt;
     frame.ang += frame.ang_vel * dt;
+    frame.ang %= 2.0 * PI;
     frame.pos += frame.vel * dt;
     // reset forces
     frame.torque = 0.0;
@@ -104,6 +100,7 @@ fn update_wheel(wheel: &mut Body, dt: f32, ci: Option<CollisionInfo>) {
     }
 
     wheel.ang += wheel.ang_vel * dt;
+    wheel.ang %= 2.0 * PI;
     wheel.pos += wheel.vel * dt;
 
     // reset forces
@@ -130,8 +127,6 @@ impl Bike {
                     ..Default::default()
                 },
             ],
-            breaking: false,
-            break_angles: [0.0; 2],
             dir: Direction::Right,
             dir_lerp: 1.0,
             prev_toggle_dir: false,
@@ -156,26 +151,14 @@ impl Bike {
         // apply forces
         // break
         let breaking = input.wheel == WheelInput::Break;
-        if breaking && !self.breaking {
-            for (i, wheel) in self.wheels.iter().enumerate() {
-                self.break_angles[i] = wheel.ang - self.frame.ang;
-            }
-        }
         if breaking {
-            for (i, wheel) in self.wheels.iter_mut().enumerate() {
-                let da = wheel.ang - self.frame.ang - self.break_angles[i];
+            for wheel in self.wheels.iter_mut() {
                 let dv = wheel.ang_vel - self.frame.ang_vel;
-                let torque = da * BREAK + dv * BREAK_FRICTION;
+                let torque = dv * BREAK_FRICTION;
                 wheel.torque -= torque;
                 self.frame.torque += torque;
             }
-        } else {
-            // wrap angles
-            self.frame.ang %= 2.0 * PI;
-            self.wheels[0].ang %= 2.0 * PI;
-            self.wheels[1].ang %= 2.0 * PI;
         }
-        self.breaking = breaking;
 
         // gas
         let (wheel, sign) = match self.dir {
@@ -201,8 +184,6 @@ impl Bike {
             let arm = arm.rotate(rot);
             let force = (self.frame.pos + arm - wheel.pos) * SUSPENSION;
 
-            // let force = force * 1.0001_f32.powf(force.length());
-
             wheel.force += force;
             self.frame.force -= force;
             self.frame.torque += force.perp_dot(arm);
@@ -213,8 +194,6 @@ impl Bike {
 
             let dv = self.frame.vel + self.frame.ang_vel * arm.perp() - wheel.vel;
             let force = dv * SUSPENSION_FRICTION;
-
-            // let force = force * 1.0001_f32.powf(force.length());
 
             wheel.force += force;
             self.frame.force -= force;
