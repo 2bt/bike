@@ -2,8 +2,7 @@ use macroquad::prelude::*;
 use std::f32::consts::PI;
 
 use crate::fx;
-use crate::level;
-use crate::level::CollisionInfo;
+use crate::level::*;
 
 const GRAVITY: f32 = 100.0;
 const FRAME_MASS: f32 = 20.0;
@@ -134,7 +133,7 @@ impl Bike {
         }
     }
 
-    pub fn update(&mut self, dt: f32, level: &mut level::Level, input: &Input) {
+    pub fn update(&mut self, dt: f32, level: &mut Level, input: &Input) {
         // toggle dir
         if input.toggle_dir && !self.prev_toggle_dir {
             self.dir = match self.dir {
@@ -242,21 +241,21 @@ impl Bike {
 
         update_frame(&mut self.frame, dt);
         for wheel in self.wheels.iter_mut() {
-            let ci = level.circle_collision(wheel.pos, WHEEL_R);
-            if let Some(CollisionInfo {
-                tpe: level::PolygonType::Lava,
-                ..
-            }) = ci
-            {
-                self.alive = false;
-            }
+            let ci = match level.circle_collision(wheel.pos, WHEEL_R) {
+                CollisionResult::Lava => {
+                    self.alive = false;
+                    None
+                }
+                CollisionResult::None => None,
+                CollisionResult::Wall(ci) => Some(ci),
+            };
             update_wheel(wheel, dt, ci);
         }
 
         // head collision
         let rot = Vec2::from_angle(self.frame.ang);
         let head = self.frame.pos + vec2(0.0, -21.0).rotate(rot);
-        if let Some(_) = level.circle_collision(head, 4.4) {
+        if level.circle_collision(head, 4.4) != CollisionResult::None {
             self.alive = false;
         }
 

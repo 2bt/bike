@@ -2,19 +2,26 @@ use macroquad::prelude::*;
 use std::f32::consts::PI;
 
 use crate::fx;
-use crate::materials;
+use crate::materials::Materials;
 
 const STAR_R: f32 = 10.0;
 
-pub enum PolygonType {
-    Wall,
-    Lava,
-}
-
+#[derive(PartialEq)]
 pub struct CollisionInfo {
     pub normal: Vec2,
     pub dist: f32,
-    pub tpe: PolygonType,
+}
+
+#[derive(PartialEq)]
+pub enum CollisionResult {
+    None,
+    Lava,
+    Wall(CollisionInfo),
+}
+
+enum PolygonType {
+    Wall,
+    Lava,
 }
 
 struct Polygon {
@@ -67,7 +74,6 @@ fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionI
         let dist = pm.length();
         if dist < r {
             return Some(CollisionInfo {
-                tpe: PolygonType::Wall,
                 normal: pm.normalize(),
                 dist: r - dist,
             });
@@ -81,7 +87,6 @@ fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionI
         }
         if dist < r {
             return Some(CollisionInfo {
-                tpe: PolygonType::Wall,
                 normal: norm,
                 dist: r - dist,
             });
@@ -91,7 +96,6 @@ fn circle_line_collision(m: Vec2, r: f32, p: Vec2, q: Vec2) -> Option<CollisionI
         let dist = qm.length();
         if dist < r {
             return Some(CollisionInfo {
-                tpe: PolygonType::Wall,
                 normal: qm.normalize(),
                 dist: r - dist,
             });
@@ -183,17 +187,15 @@ impl Level {
         Ok(level)
     }
 
-    pub fn circle_collision(&self, pos: Vec2, r: f32) -> Option<CollisionInfo> {
+    // pub fn circle_collision(&self, pos: Vec2, r: f32) -> Option<CollisionInfo> {
+    pub fn circle_collision(&self, pos: Vec2, r: f32) -> CollisionResult {
         let mut colli: Option<CollisionInfo> = None;
         for poly in self.polygons.iter() {
             for (i, p) in poly.points.iter().enumerate() {
                 let q = poly.points[(i + 1) % poly.points.len()];
                 if let Some(ci) = circle_line_collision(pos, r, *p, q) {
                     if let PolygonType::Lava = poly.tpe {
-                        return Some(CollisionInfo {
-                            tpe: PolygonType::Lava,
-                            ..ci
-                        });
+                        return CollisionResult::Lava;
                     }
                     colli = Some(match colli {
                         Some(cc) if cc.dist > ci.dist => cc,
@@ -202,7 +204,10 @@ impl Level {
                 }
             }
         }
-        colli
+        match colli {
+            None => CollisionResult::None,
+            Some(ci) => CollisionResult::Wall(ci),
+        }
     }
 
     pub fn pickup_stars(&mut self, pos: Vec2, r: f32) {
@@ -223,8 +228,7 @@ impl Level {
         self.time += dt;
     }
 
-    pub fn draw(&self, materials: &materials::Materials) {
-
+    pub fn draw(&self, materials: &Materials) {
         gl_use_material(&materials.wall_material);
         draw_mesh(&self.wall_mesh);
 
