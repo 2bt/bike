@@ -4,6 +4,8 @@ This is a bike game inspired by the legendary game **Action SuperCross**.
 Collect all stars and beat the time, but watch out for your head!
 [Try it out now!](https://2bt.github.io/bike/)
 
+![image](screenshot.png)
+
 ### Controls
 <table>
 	<tr>
