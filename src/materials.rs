@@ -15,9 +15,8 @@ impl Materials {
         Materials {
             font,
             wall_material: load_material(
-                ShaderSource {
-                    glsl_vertex: Some(
-                        "#version 100
+                ShaderSource::Glsl {
+                    vertex: "#version 100
 precision lowp float;
 attribute vec3 position;
 varying vec2 uv;
@@ -27,9 +26,7 @@ void main() {
     gl_Position = Projection * Model * vec4(position, 1);
     uv = position.xy;
 }",
-                    ),
-                    glsl_fragment: Some(
-                        "#version 100
+                    fragment: "#version 100
 precision lowp float;
 varying vec2 uv;
 void main() {
@@ -40,17 +37,14 @@ void main() {
         vec4(0.11, 0.34, 0.22, 1.0),
         vec4(0.11, 0.4, 0.3, 1.0),
         x);
-}",
-                    ),
-                    metal_shader: None,
+}"
                 },
                 Default::default(),
             )
             .unwrap(),
             lava_material: load_material(
-                ShaderSource {
-                    glsl_vertex: Some(
-                        "#version 100
+                ShaderSource::Glsl {
+                    vertex: "#version 100
 precision lowp float;
 attribute vec3 position;
 varying vec2 uv;
@@ -60,9 +54,7 @@ void main() {
     gl_Position = Projection * Model * vec4(position, 1);
     uv = position.xy;
 }",
-                    ),
-                    glsl_fragment: Some(
-                        "#version 100
+                    fragment: "#version 100
 precision lowp float;
 varying vec2 uv;
 void main() {
@@ -73,9 +65,7 @@ void main() {
         vec4(0.4, 0.2, 0.2, 1.0),
         vec4(0.5, 0.2, 0.2, 1.0),
         x);
-}",
-                    ),
-                    metal_shader: None,
+}"
                 },
                 Default::default(),
             )

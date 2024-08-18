@@ -7,7 +7,8 @@ pub fn vert(p: Vec2, color: Color) -> Vert {
     Vert {
         position: p.extend(0.0),
         uv: Vec2::ZERO,
-        color,
+        color: color.into(),
+        normal: Vec4::ZERO,
     }
 }
 

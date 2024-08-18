@@ -10,5 +10,5 @@ lto = true
 opt-level = 's'
 
 [dependencies]
-macroquad = "0.4"
+macroquad = "0.4.2"
 serde_json = "1.0"

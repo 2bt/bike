@@ -284,8 +284,12 @@ impl Game {
         set_camera(&cam);
 
         match self.state {
-            GameState::GameOver => draw_text_ex("OUCH!", -70.0, -50.0, tp_big.clone()),
-            GameState::LevelCompleted => draw_text_ex("WELL DONE!", -117.0, -50.0, tp_big.clone()),
+            GameState::GameOver => {
+                draw_text_ex("OUCH!", -70.0, -50.0, tp_big.clone());
+            }
+            GameState::LevelCompleted => {
+                draw_text_ex("WELL DONE!", -117.0, -50.0, tp_big.clone());
+            }
             GameState::LevelMenu => {
                 draw_text_ex("BIKE", -52.0, -80.0, tp_big.clone());
                 for (i, &t) in self.level_times.iter().enumerate() {
