@@ -8,13 +8,14 @@ mod materials;
 const W: f32 = 480.0;
 const H: f32 = 270.0;
 
-const LEVEL_FILES: [&'static str; 6] = [
+const LEVEL_FILES: [&'static str; 7] = [
     "level1.tmj", //
     "level2.tmj", //
     "level3.tmj", //
     "level4.tmj", //
     "level5.tmj", //
     "level6.tmj", //
+    "level7.tmj", //
 ];
 
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
